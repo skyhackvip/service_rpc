@@ -1,15 +1,34 @@
 package main
 
 import (
-	"encoding/gob"
+	//"encoding/gob"
 	"fmt"
 	"github.com/skyhackvip/service_rpc/consumer"
-	"github.com/skyhackvip/service_rpc/user"
-	"net"
+	//"github.com/skyhackvip/service_rpc/user"
+	//"net"
 )
 
 func main() {
-	conn, err := net.Dial("tcp", "localhost:3332")
+
+	var LocalTest func() string
+	r, err := consumer.Call("user.Test", &LocalTest)
+	fmt.Println(r)
+	fmt.Println(err)
+	consumer.ReflectCall(map[string]interface{}{"Test": LocalTest}, "Test")
+
+	var LocalTest2 func(n string) (string, error)
+	r, err = consumer.Call("user.TestInt", &LocalTest2, "1")
+	fmt.Println(r)
+	fmt.Println(err)
+	consumer.ReflectCall(map[string]interface{}{"TestInt": LocalTest2}, "TestInt", "1")
+
+	/*var LocalTest3 func(a, b string) (string, error)
+	r, err = consumer.Call("user.Test3", &LocalTest3, "1", "2")
+	fmt.Println(r)
+	fmt.Println(err)
+	*/
+
+	/*conn, err := net.Dial("tcp", "localhost:3332")
 	if err != nil {
 		panic(err)
 	}
@@ -40,5 +59,6 @@ func main() {
 	cli.Call("QueryUser1", &LocalQueryUser1) //赋值到本地
 	u, err = LocalQueryUser1("a")
 	fmt.Println(u, err)
+	*/
 
 }

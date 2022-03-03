@@ -3,23 +3,48 @@ package main
 import (
 	"encoding/gob"
 	"errors"
+	"flag"
 	"fmt"
+	_ "github.com/skyhackvip/service_rpc/naming"
 	"github.com/skyhackvip/service_rpc/provider"
 	"github.com/skyhackvip/service_rpc/user"
+	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 )
 
+var (
+	hostname string
+	appid    string
+	port     string
+	ip       string
+	env      string
+)
+
+func init() {
+	fmt.Println(os.Hostname)
+	if hostname, err := os.Hostname(); err != nil || hostname == "" {
+		fmt.Println(err)
+		hostname = os.Getenv("HOSTNAME") //system enviorment
+	}
+	if ip = InternalIP(); ip == "" {
+		ip = os.Getenv("IP")
+	}
+	flag.StringVar(&appid, "appid", os.Getenv("APPID"), "appid required")
+	flag.StringVar(&port, "port", os.Getenv("PORT"), "port required")
+	flag.StringVar(&env, "env", os.Getenv("ENV"), "env required")
+}
+
 func main() {
-	//fmt.Println(Test())
-	//fmt.Println(QueryUser(1))
-	//fmt.Println(QueryUser(3))
+	addr := ip + ":" + port
+	fmt.Println(addr)
 
 	//listen port
-	srv := provider.NewRPCServer("localhost:3332")
+	srv := provider.NewRPCServer(addr)
 
-	//register service
+	//register local service
 	srv.Register("Test", Test)
 	srv.Register("TestInt", TestInt)
 	srv.Register("QueryUser", QueryUser)
@@ -29,11 +54,24 @@ func main() {
 
 	go srv.Run()
 
+	//register to center
+	/*nodes := []string{"localhost:8881"}
+	conf := &naming.Config{Nodes: nodes, Env: env}
+	dis := naming.New(conf)
+	instance := &naming.Instance{
+		AppId:    appid,
+		Addrs:    []string{addr},
+		Hostname: hostname,
+	}
+	dis.Register(instance)
+	*/
+
 	//graceful restart
 	quit := make(chan os.Signal)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
 	<-quit
 	srv.Close()
+	//dis.Cancel()
 }
 
 func Test() string {
@@ -71,4 +109,27 @@ func QueryUser1(id string) (user.User, error) {
 		return u, nil
 	}
 	return user.User{}, fmt.Errorf("id %s not found", id)
+}
+
+func InternalIP() string {
+	inters, err := net.Interfaces()
+	if err != nil {
+		return ""
+	}
+	for _, inter := range inters {
+		if !strings.HasPrefix(inter.Name, "lo") {
+			addrs, err := inter.Addrs()
+			if err != nil {
+				continue
+			}
+			for _, addr := range addrs {
+				if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+					if ipnet.IP.To4() != nil {
+						return ipnet.IP.String()
+					}
+				}
+			}
+		}
+	}
+	return ""
 }
