@@ -21,6 +21,7 @@ func NewClient(conn net.Conn) *Client {
 func (cli *Client) Call(name string, funcPtr interface{}) {
 	log.Println("---- start call:", name)
 	container := reflect.ValueOf(funcPtr).Elem() //反射获取函数元素
+	log.Printf("5:%T", container)
 
 	f := func(req []reflect.Value) []reflect.Value {
 		//出参个数

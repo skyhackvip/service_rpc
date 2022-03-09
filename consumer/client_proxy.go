@@ -2,7 +2,6 @@ package consumer
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"reflect"
 	"strings"
@@ -12,14 +11,12 @@ func Call(funcName string, localFunc interface{}, params ...interface{}) (interf
 	//get service
 	service, err := split(funcName)
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 
 	//connect server
 	conn, err := connHost(getHost(service.AppId))
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 	cli := NewClient(conn)
@@ -28,8 +25,7 @@ func Call(funcName string, localFunc interface{}, params ...interface{}) (interf
 	cli.Call(service.Method, localFunc)
 
 	//reflect call
-	//return reflectCall(map[string]interface{}{service.Method: localFunc}, service.Method, params)
-	return nil, nil
+	return reflectCall(map[string]interface{}{service.Method: localFunc}, service.Method, params...)
 }
 
 type Service struct {
@@ -37,7 +33,7 @@ type Service struct {
 	Method string
 }
 
-//user.GetUser
+//demo: user.GetUser
 func split(fun string) (Service, error) {
 	arr := strings.Split(fun, ".")
 	service := Service{}
@@ -63,10 +59,8 @@ func connHost(host string) (net.Conn, error) {
 	return conn, nil
 }
 
-func ReflectCall(funcMap map[string]interface{}, name string, params ...interface{}) ([]reflect.Value, error) {
-	f := reflect.ValueOf(funcMap[name]) //.Elem()
-	fmt.Printf("2:%T\n", f)
-	fmt.Println(len(params), f.Type().NumIn())
+func reflectCall(funcMap map[string]interface{}, name string, params ...interface{}) ([]reflect.Value, error) {
+	f := reflect.ValueOf(funcMap[name]).Elem()
 	if len(params) != f.Type().NumIn() {
 		return nil, errors.New("params not adapted")
 	}

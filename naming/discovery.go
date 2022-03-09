@@ -37,6 +37,12 @@ type Discovery struct {
 	ctx        context.Context
 	cancelFunc context.CancelFunc
 
+	//local cache
+	mutex    sync.RWMutex
+	apps     map[string]*FetchData
+	registry map[string]struct{}
+
+	//registry center node
 	idx  uint64       //node index
 	node atomic.Value //node list
 }
@@ -50,6 +56,8 @@ func New(conf *Config) *Discovery {
 		ctx:        ctx,
 		cancelFunc: cancel,
 		conf:       conf,
+		apps:       map[string]*FetchData{},
+		registry:   map[string]struct{}{},
 	}
 	//from conf get node list
 	dis.node.Store(conf.Nodes)
@@ -58,8 +66,27 @@ func New(conf *Config) *Discovery {
 }
 
 func (dis *Discovery) Register(instance *Instance) (context.CancelFunc, error) {
+	var err error
+	//check local cache
+	dis.mutex.Lock()
+	if _, ok := dis.registry[instance.AppId]; ok {
+		err = errors.New("instance duplicate register")
+	} else {
+		dis.registry[instance.AppId] = struct{}{} //register local cache
+	}
+	dis.mutex.Unlock()
+
+	if err != nil {
+		return nil, err
+	}
+
+	//http register
 	ctx, cancel := context.WithCancel(dis.ctx)
-	if err := dis.register(instance); err != nil {
+	if err = dis.register(instance); err != nil {
+		//fail
+		dis.mutex.Lock()
+		delete(dis.registry, instance.AppId)
+		dis.mutex.Unlock()
 		return cancel, err
 	}
 
@@ -69,10 +96,10 @@ func (dis *Discovery) Register(instance *Instance) (context.CancelFunc, error) {
 		<-ch
 	})
 
+	//renew&cancel
 	go func() {
 		ticker := time.NewTicker(_renewInterval)
 		defer ticker.Stop()
-
 		for {
 			select {
 			case <-ticker.C:
@@ -240,6 +267,16 @@ func (dis *Discovery) pickNode() string {
 		return dis.conf.Nodes[dis.idx%uint64(len(dis.conf.Nodes))]
 	}
 	return nodes[dis.idx%uint64(len(nodes))]
+}
+
+func (dis *Discovery) Fetch(ctx context.Context, appId string) (map[string][]*FetchData, bool) {
+	//from local
+	dis.mutex.RLock()
+	app, ok := dis.apps[appId]
+	dis.mutex.RUnlock()
+	if ok {
+
+	}
 }
 
 type Response struct {

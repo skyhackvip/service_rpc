@@ -1,10 +1,10 @@
 package main
 
 import (
-	//"encoding/gob"
+	"encoding/gob"
 	"fmt"
 	"github.com/skyhackvip/service_rpc/consumer"
-	//"github.com/skyhackvip/service_rpc/user"
+	"github.com/skyhackvip/service_rpc/user"
 	//"net"
 )
 
@@ -12,15 +12,17 @@ func main() {
 
 	var LocalTest func() string
 	r, err := consumer.Call("user.Test", &LocalTest)
-	fmt.Println(r)
-	fmt.Println(err)
-	consumer.ReflectCall(map[string]interface{}{"Test": LocalTest}, "Test")
+	fmt.Println(r, err)
 
 	var LocalTest2 func(n string) (string, error)
 	r, err = consumer.Call("user.TestInt", &LocalTest2, "1")
-	fmt.Println(r)
-	fmt.Println(err)
-	consumer.ReflectCall(map[string]interface{}{"TestInt": LocalTest2}, "TestInt", "1")
+	fmt.Println(r, err)
+
+	gob.Register(user.User{})
+	var LocalQueryUser func(id int) (user.User, error)
+	consumer.Call("user.QueryUser", &LocalQueryUser)
+	u, err := LocalQueryUser(1)
+	fmt.Println(u, err)
 
 	/*var LocalTest3 func(a, b string) (string, error)
 	r, err = consumer.Call("user.Test3", &LocalTest3, "1", "2")
