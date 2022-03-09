@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 )
@@ -18,31 +19,28 @@ import (
 var (
 	hostname string
 	appid    string
-	port     string
+	port     int
 	ip       string
 	env      string
 )
 
 func init() {
-	fmt.Println(os.Hostname)
 	if hostname, err := os.Hostname(); err != nil || hostname == "" {
-		fmt.Println(err)
 		hostname = os.Getenv("HOSTNAME") //system enviorment
 	}
 	if ip = InternalIP(); ip == "" {
 		ip = os.Getenv("IP")
 	}
 	flag.StringVar(&appid, "appid", os.Getenv("APPID"), "appid required")
-	flag.StringVar(&port, "port", os.Getenv("PORT"), "port required")
 	flag.StringVar(&env, "env", os.Getenv("ENV"), "env required")
+	port, _ = strconv.Atoi(os.Getenv("PORT"))
+	flag.IntVar(&port, "port", port, "port required")
 }
 
 func main() {
-	addr := ip + ":" + port
-	fmt.Println(addr)
 
 	//listen port
-	srv := provider.NewRPCServer(addr)
+	srv := provider.NewRPCServer(ip, port)
 
 	//register local service
 	srv.Register("Test", Test)
