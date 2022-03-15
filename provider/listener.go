@@ -91,12 +91,13 @@ func (l *RPCListener) handleConn(conn net.Conn) {
 		log.Printf("decode data finish:%v\n", inArgs)
 
 		//call local service
-		handler, ok := l.Handlers[msg.ServiceMethod]
+		handler, ok := l.Handlers[msg.ServiceClass]
 		if !ok {
 			log.Println("can not found handler")
 			return
 		}
-		result, err := handler.Handle(inArgs)
+		log.Println("1111111111", msg.ServiceClass, handler)
+		result, err := handler.Handle(msg.ServiceMethod, inArgs)
 		log.Println("call local service finish! result:", result)
 
 		//encode

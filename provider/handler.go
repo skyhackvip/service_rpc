@@ -1,32 +1,38 @@
 package provider
 
 import (
-	//	"github.com/skyhackvip/service_rpc/data"
+	"fmt"
 	"reflect"
 )
 
 type Handler interface {
-	Handle([]interface{}) ([]interface{}, error)
+	Handle(string, []interface{}) ([]interface{}, error)
 }
 
 type RPCServerHandler struct {
-	svr *RPCServer
-	f   reflect.Value
+	svr   *RPCServer
+	class reflect.Value
 }
 
 //call local service
-func (handler *RPCServerHandler) Handle(params []interface{}) ([]interface{}, error) {
-	//get arguments 如果有入参
+func (handler *RPCServerHandler) Handle(method string, params []interface{}) ([]interface{}, error) {
+	fmt.Println("handler")
+	//get arguments if params is not empty
 	args := make([]reflect.Value, len(params))
 	for i := range params {
 		//reflect.TypeOf(req.Args[i])  //[]interface{}
 		args[i] = reflect.ValueOf(params[i]) //[1]
 	}
+	fmt.Println(args)
 
-	//start call
-	result := handler.f.Call(args) //reflect value类型，如果看value是func，可以调用Call方法执行
+	//get method
+	fmt.Println(handler.class)
+	reflectMethod := handler.class.MethodByName(method)
+	fmt.Println(method, reflectMethod)
 
-	//result
+	result := reflectMethod.Call(args)
+	fmt.Println(result)
+
 	resArgs := make([]interface{}, len(result))
 	for i := 0; i < len(result); i++ {
 		resArgs[i] = result[i].Interface()

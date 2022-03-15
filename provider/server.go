@@ -22,9 +22,14 @@ func NewRPCServer(ip string, port int) *RPCServer {
 }
 
 //register service
-func (svr *RPCServer) Register(name string, function interface{}) {
-	handler := &RPCServerHandler{f: reflect.ValueOf(function)}
-	svr.listener.SetHandler(name, handler) //check exitsted first
+func (svr *RPCServer) Register(class interface{}) {
+	name := reflect.Indirect(reflect.ValueOf(class)).Type().Name()
+	svr.RegisterName(name, class)
+}
+
+func (svr *RPCServer) RegisterName(name string, class interface{}) {
+	handler := &RPCServerHandler{class: reflect.ValueOf(class)}
+	svr.listener.SetHandler(name, handler)
 	log.Printf("%s registered success!\n", name)
 }
 
