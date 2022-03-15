@@ -38,7 +38,9 @@ func (trans *Transport) Read() ([]byte, error) {
 func (trans *Transport) Send(data []byte) error {
 	headerLen := config.HEADER_LEN
 	buffer := make([]byte, headerLen+len(data))
+	//长度
 	binary.BigEndian.PutUint32(buffer[:headerLen], uint32(len(data)))
+
 	copy(buffer[headerLen:], data)
 	_, err := trans.conn.Write(buffer)
 	return err
