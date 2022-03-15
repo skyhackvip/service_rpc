@@ -272,11 +272,12 @@ func (dis *Discovery) pickNode() string {
 func (dis *Discovery) Fetch(ctx context.Context, appId string) (map[string][]*FetchData, bool) {
 	//from local
 	dis.mutex.RLock()
-	app, ok := dis.apps[appId]
+	_, ok := dis.apps[appId]
 	dis.mutex.RUnlock()
 	if ok {
 
 	}
+	return nil, ok
 }
 
 type Response struct {
