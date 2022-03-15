@@ -15,7 +15,7 @@ import (
 
 type Client interface {
 	Connect(string) error
-	Invoke(context.Context, string, interface{}, ...interface{}) (interface{}, error)
+	Invoke(context.Context, *Service, interface{}, ...interface{}) (interface{}, error)
 	Close()
 }
 
@@ -51,10 +51,10 @@ func (cli *RPCClient) Connect(addr string) error {
 	return nil
 }
 
-func (cli *RPCClient) Invoke(ctx context.Context, methodName string, stub interface{}, params ...interface{}) (interface{}, error) {
+func (cli *RPCClient) Invoke(ctx context.Context, service *Service, stub interface{}, params ...interface{}) (interface{}, error) {
 
 	//make func : this step can be prepared before invoke and store into cache
-	cli.makeCall(methodName, stub)
+	cli.makeCall(service, stub)
 
 	//reflect call
 	return cli.wrapCall(ctx, stub, params...)
@@ -67,8 +67,8 @@ func (cli *RPCClient) Close() {
 }
 
 //make call func
-func (cli *RPCClient) makeCall(methodName string, methodPtr interface{}) {
-	log.Println("---- start call:", methodName)
+func (cli *RPCClient) makeCall(service *Service, methodPtr interface{}) {
+	log.Printf("----start call:%s.%s----\n", service.Class, service.Method)
 	container := reflect.ValueOf(methodPtr).Elem() //反射获取函数元素
 	coder := codec.New(config.CODEC_GOB)
 
@@ -97,7 +97,6 @@ func (cli *RPCClient) makeCall(methodName string, methodPtr interface{}) {
 			log.Printf("encode err:%v\n", err)
 			return errorHandler(err)
 		}
-		log.Println("encode success!", payload)
 
 		//send by network
 		msg := protocol.NewRPCMsg()
@@ -105,7 +104,8 @@ func (cli *RPCClient) makeCall(methodName string, methodPtr interface{}) {
 		msg.SetMsgType(protocol.Request)
 		msg.SetCompressType(cli.option.CompressType)
 		msg.SetSerializeType(cli.option.SerializeType)
-		msg.ServiceMethod = methodName
+		msg.ServiceClass = service.Class
+		msg.ServiceMethod = service.Method
 		msg.Payload = payload
 		_, err = msg.Send(cli.conn)
 		if err != nil {
@@ -128,7 +128,7 @@ func (cli *RPCClient) makeCall(methodName string, methodPtr interface{}) {
 			log.Printf("decode err:%v\n", err)
 			return errorHandler(err)
 		}
-		log.Println("decode success!", respDecode)
+		log.Println("decode success!")
 
 		//output result
 		if len(respDecode) == 0 {

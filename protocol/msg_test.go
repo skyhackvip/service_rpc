@@ -21,12 +21,14 @@ func TestMsg(t *testing.T) {
 		req.Metadata = meta
 	*/
 
-	req.ServiceMethod = "Test.Add"
+	req.ServiceClass = "User"
+	req.ServiceMethod = "getUserById"
+
 	//req.Payload = []byte(`{"a":1, "b":2,}`)
 	payload := map[string]int{"a": 1, "b": 2}
 	coder := codec.New(config.CODEC_GOB)
-	p, _ := coder.Encode(payload)
-	req.Payload = p
+	encodePayload, _ := coder.Encode(payload)
+	req.Payload = encodePayload
 
 	var buf bytes.Buffer
 	a, err := req.Send(&buf)
@@ -40,10 +42,10 @@ func TestMsg(t *testing.T) {
 	t.Log(res.Header.CompressType())
 	t.Log(res.Header.MsgType())
 	t.Log(res.Header.SerializeType())
+	t.Log(res.ServiceClass)
 	t.Log(res.ServiceMethod)
 	rs := make(map[string]int, 0)
 	err = coder.Decode(res.Payload, &rs)
-	//t.Log(byteToString(res.Payload))
 	t.Log(rs, err)
 
 }

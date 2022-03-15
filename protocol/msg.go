@@ -13,6 +13,7 @@ const (
 
 type RPCMsg struct {
 	*Header
+	ServiceClass  string
 	ServiceMethod string
 	Payload       []byte
 	Metadata      map[string]string
@@ -33,26 +34,38 @@ func (msg *RPCMsg) Send(writer io.Writer) (int64, error) {
 		return int64(h), err
 	}
 
-	//write body total len
-	dataLen := SPLIT_LEN + len(msg.ServiceMethod) + SPLIT_LEN + len(msg.Payload)
-	err = binary.Write(writer, binary.BigEndian, uint32(dataLen))
+	//write body total len :4 byte
+	dataLen := SPLIT_LEN + len(msg.ServiceClass) + SPLIT_LEN + len(msg.ServiceMethod) + SPLIT_LEN + len(msg.Payload)
+	err = binary.Write(writer, binary.BigEndian, uint32(dataLen)) //4
 	if err != nil {
 		return 0, err
 	}
 
-	//write service len 4
+	//write service class len :4 byte
+	err = binary.Write(writer, binary.BigEndian, uint32(len(msg.ServiceClass)))
+	if err != nil {
+		return 0, err
+	}
+
+	//write service class
+	err = binary.Write(writer, binary.BigEndian, StringToByte(msg.ServiceClass))
+	if err != nil {
+		return 0, err
+	}
+
+	//write service method len :4 byte
 	err = binary.Write(writer, binary.BigEndian, uint32(len(msg.ServiceMethod)))
 	if err != nil {
 		return 0, err
 	}
 
-	//write service content
+	//write service method
 	err = binary.Write(writer, binary.BigEndian, StringToByte(msg.ServiceMethod))
 	if err != nil {
 		return 0, err
 	}
 
-	//write payload len 4
+	//write payload len :4 byte
 	err = binary.Write(writer, binary.BigEndian, uint32(len(msg.Payload)))
 	if err != nil {
 		return 0, err
@@ -68,41 +81,52 @@ func (msg *RPCMsg) Send(writer io.Writer) (int64, error) {
 }
 
 func (msg *RPCMsg) Decode(r io.Reader) error {
-	_, err := io.ReadFull(r, msg.Header[:]) //magicNumber
-	if !msg.Header.CheckMagicNumber() {
+	//read header
+	_, err := io.ReadFull(r, msg.Header[:])
+	if !msg.Header.CheckMagicNumber() { //magicNumber
 		return fmt.Errorf("magic number error: %v", msg.Header[0])
 	}
 
+	//total body len
 	headerByte := make([]byte, 4)
 	_, err = io.ReadFull(r, headerByte)
 	if err != nil {
 		return err
 	}
+	bodyLen := binary.BigEndian.Uint32(headerByte)
 
-	//datalen
-	dataLen := binary.BigEndian.Uint32(headerByte)
-
-	//all data byte
-	data := make([]byte, dataLen)
+	//read all body
+	data := make([]byte, bodyLen)
 	_, err = io.ReadFull(r, data)
 
-	//4
-	n := 0
-	l := binary.BigEndian.Uint32(data[n : n+4]) //0,4
+	//service class len
+	start := 0
+	end := start + SPLIT_LEN
+	classLen := binary.BigEndian.Uint32(data[start:end]) //0,4
 
-	//serviceMethod
-	n = n + 4 //
-	nEnd := n + int(l)
-	msg.ServiceMethod = ByteToString(data[n:nEnd])
+	//service class
+	start = end
+	end = start + int(classLen)
+	msg.ServiceClass = ByteToString(data[start:end]) //4,x
 
-	//4
-	n = nEnd
-	l = binary.BigEndian.Uint32(data[n : n+4])
+	//service method len
+	start = end
+	end = start + SPLIT_LEN
+	methodLen := binary.BigEndian.Uint32(data[start:end]) //x,x+4
+
+	//service method
+	start = end
+	end = start + int(methodLen)
+	msg.ServiceMethod = ByteToString(data[start:end]) //x+4, x+4+y
+
+	//payload len
+	start = end
+	end = start + SPLIT_LEN
+	binary.BigEndian.Uint32(data[start:end]) //x+4+y, x+y+8 payloadLen
 
 	//payload
-	n = n + 4
-	msg.Payload = data[n:]
-
+	start = end
+	msg.Payload = data[start:]
 	return nil
 }
 

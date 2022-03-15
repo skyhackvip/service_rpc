@@ -25,8 +25,8 @@ func NewClientProxy(option Option) ClientProxy {
 	}
 }
 
-func (cp *RPCClientProxy) Call(ctx context.Context, serviceName string, stub interface{}, params ...interface{}) (interface{}, error) {
-	service, err := NewService(serviceName)
+func (cp *RPCClientProxy) Call(ctx context.Context, servicePath string, stub interface{}, params ...interface{}) (interface{}, error) {
+	service, err := NewService(servicePath)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func (cp *RPCClientProxy) Call(ctx context.Context, serviceName string, stub int
 	retries := cp.option.Retries
 	for retries > 0 {
 		retries--
-		return client.Invoke(ctx, service.Method, stub, params...)
+		return client.Invoke(ctx, service, stub, params...)
 	}
 	return nil, errors.New("error")
 }

@@ -7,19 +7,21 @@ import (
 
 type Service struct {
 	AppId  string
+	Class  string
 	Method string
 	Addrs  []string
 }
 
-//demo: test.HelloWorld user.GetUser
-func NewService(methodName string) (*Service, error) {
-	arr := strings.Split(methodName, ".")
+//demo: user_service.user.GetUser
+func NewService(servicePath string) (*Service, error) {
+	arr := strings.Split(servicePath, ".")
 	service := &Service{}
-	if len(arr) != 2 {
-		return service, errors.New("method name inlegal")
+	if len(arr) != 3 {
+		return service, errors.New("service path inlegal")
 	}
 	service.AppId = arr[0]
-	service.Method = arr[1]
+	service.Class = arr[1]
+	service.Method = arr[2]
 	return service, nil
 }
 
