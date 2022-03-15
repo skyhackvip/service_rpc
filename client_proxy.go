@@ -8,7 +8,7 @@ import (
 type ClientProxy interface {
 	//select
 	//auth
-	Call(context.Context, string, interface{}, ...interface{}) (interface{}, error)
+	Call()
 }
 
 type RPCClientProxy struct {
@@ -25,21 +25,22 @@ func NewClientProxy(option Option) ClientProxy {
 	}
 }
 
-func (cp *RPCClientProxy) Call(ctx context.Context, serviceName string, stub interface{}, params ...interface{}) (interface{}, error) {
-	service, err := NewService(serviceName)
+func (cp *RPCClientProxy) Call(ctx context.Context, methodName string, stub interface{}, params ...interface{}) (interface{}, error) {
+	service, err := NewService(methodName)
 	if err != nil {
 		return nil, err
 	}
-	client := NewClient(cp.option)
+	client := NewClient(option)
 	addr := service.SelectAddr()
 	err = client.Connect(addr) //长连接管理
+	defer client.Close()
 	if err != nil {
 		return nil, err
 	}
 	retries := cp.option.Retries
 	for retries > 0 {
 		retries--
-		return client.Invoke(ctx, service.Method, stub, params...)
+		return client.Invoke(ctx, service.Name, stub, params...)
 	}
 	return nil, errors.New("error")
 }

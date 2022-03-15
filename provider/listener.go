@@ -2,9 +2,9 @@ package provider
 
 import (
 	"fmt"
+	"github.com/skyhackvip/service_rpc/codec"
 	"github.com/skyhackvip/service_rpc/config"
-	"github.com/skyhackvip/service_rpc/data"
-	"github.com/skyhackvip/service_rpc/transport"
+	"github.com/skyhackvip/service_rpc/protocol"
 	"io"
 	"log"
 	"net"
@@ -22,6 +22,7 @@ type RPCListener struct {
 	ServicePort int
 	Handlers    map[string]Handler
 	nl          net.Listener
+	//	closed      chan struct{}
 }
 
 func NewRPCListener(serviceIp string, servicePort int) *RPCListener {
@@ -42,7 +43,7 @@ func (l *RPCListener) SetHandler(name string, handler Handler) {
 func (l *RPCListener) Run() {
 	//listen on port by tcp
 	addr := fmt.Sprintf("%s:%d", l.ServiceIp, l.ServicePort)
-	nl, err := net.Listen("tcp", addr)
+	nl, err := net.Listen(config.NET_TRANS_PROTOCOL, addr)
 	if err != nil {
 		panic(err)
 	}
@@ -53,78 +54,99 @@ func (l *RPCListener) Run() {
 	for {
 		conn, err := l.nl.Accept()
 		if err != nil {
-			log.Printf("accept err: %v\n", err)
+			//log.Printf("accept err: %v\n", err)
 			continue
 		}
 
 		//create new routine worker each connection
 		go l.handleConn(conn)
 	}
-
 }
 
 //handle each connection
+//TODO:对异常 err 处理
 func (l *RPCListener) handleConn(conn net.Conn) {
+	fmt.Println()
 	log.Println("---- handle conn ----")
 
-	trans := transport.NewTransport(conn) //transport include conn and handle read/write
-
-	rpcData := data.New(config.TRANS_TYPE) //data format:json/gob
+	defer catchPanic()
 
 	for {
 		log.Println("---- loop start ----")
 
 		//read from network
-		reqData, err := trans.Read() //[]byte
-		if err != nil {
-			if err != io.EOF { //close
-				log.Printf("read finish:%v\n", err)
-				return
-			}
-			log.Printf("read panic:%v\n", err)
+		msg, err := l.receiveData(conn)
+		if err != nil || msg == nil {
 			return
 		}
-		log.Println("--- read data finish---")
-		//decode data
-		decodeData, err := rpcData.Decode(reqData) //rpcdata
+
+		//decode
+		coder := codec.New(config.CODEC_GOB) //msg.Header.SerializeType()) //get from cache
+		inArgs := make([]interface{}, 0)
+		err = coder.Decode(msg.Payload, &inArgs) //rpcdata
 		if err != nil {
 			log.Println("decode request err:%v\n", err)
 			return
 		}
-		log.Printf("decode data finish:%v\n", decodeData)
+		log.Printf("decode data finish:%v\n", inArgs)
 
 		//call local service
-		//get handler
-		handler, ok := l.Handlers[decodeData.Name]
+		handler, ok := l.Handlers[msg.ServiceMethod]
 		if !ok {
 			log.Println("can not found handler")
 			return
 		}
-
-		result := handler.Handle(decodeData)
+		result, err := handler.Handle(inArgs)
 		log.Println("call local service finish! result:", result)
 
-		log.Println("call local service finish! result:", result)
-
-		encodeRes, err := rpcData.Encode(result) //[]byte
+		//encode
+		encodeRes, err := coder.Encode(result) //[]byte result + err
 		if err != nil {
 			log.Printf("encode err:%v\n", err)
 			return
 		}
-		log.Printf("encode result finish!")
+
 		//send result
-		err = trans.Send(encodeRes)
+		err = l.sendData(conn, encodeRes)
 		if err != nil {
 			log.Printf("send err:%v\n", err)
 			return
 		}
 		log.Printf("send result finish!")
-
-		log.Println("---- loop end ----")
-
 	}
 }
 
+func (l *RPCListener) receiveData(conn net.Conn) (*protocol.RPCMsg, error) {
+	msg, err := protocol.Read(conn)
+	if err != nil {
+		if err != io.EOF { //close
+			return nil, err
+		}
+		log.Printf("read finish:%v\n", err)
+	}
+	return msg, nil
+}
+
+func (l *RPCListener) sendData(conn net.Conn, payload []byte) error {
+	resMsg := protocol.NewRPCMsg()
+	resMsg.SetVersion(config.Protocol_MsgVersion)
+	resMsg.SetMsgType(protocol.Response)
+	resMsg.SetCompressType(protocol.None)
+	resMsg.SetSerializeType(protocol.Gob)
+	resMsg.Payload = payload
+	_, err := resMsg.Send(conn)
+	return err
+}
+
 func (l *RPCListener) Close() {
-	l.nl.Close()
+	if l.nl != nil {
+		l.nl.Close()
+	}
+}
+
+func catchPanic() {
+	err := recover()
+	if err != nil {
+		log.Println("catch panic err:", err)
+	}
 }

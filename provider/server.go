@@ -5,6 +5,12 @@ import (
 	"reflect"
 )
 
+type Server interface {
+	Register(string, interface{}) //error
+	Run()
+	Close()
+}
+
 type RPCServer struct {
 	listener Listener //*Listener is error
 }
@@ -30,7 +36,6 @@ func (svr *RPCServer) Run() {
 //service stop
 func (svr *RPCServer) Close() {
 	if svr.listener != nil {
-		log.Println("server close")
 		svr.listener.Close()
 	}
 }

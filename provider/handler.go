@@ -1,12 +1,12 @@
 package provider
 
 import (
-	"github.com/skyhackvip/service_rpc/data"
+	//	"github.com/skyhackvip/service_rpc/data"
 	"reflect"
 )
 
 type Handler interface {
-	Handle(req data.RPCData) data.RPCData
+	Handle([]interface{}) ([]interface{}, error)
 }
 
 type RPCServerHandler struct {
@@ -15,19 +15,12 @@ type RPCServerHandler struct {
 }
 
 //call local service
-func (handler *RPCServerHandler) Handle(req data.RPCData) data.RPCData {
-	//get func
-	/*f, ok := svr.funcs[req.Name]
-	if !ok {
-		log.Printf("%s is not exists\n", req.Name)
-		return data.RPCData{}
-	}*/
-
+func (handler *RPCServerHandler) Handle(params []interface{}) ([]interface{}, error) {
 	//get arguments 如果有入参
-	args := make([]reflect.Value, len(req.Args))
-	for i := range req.Args {
+	args := make([]reflect.Value, len(params))
+	for i := range params {
 		//reflect.TypeOf(req.Args[i])  //[]interface{}
-		args[i] = reflect.ValueOf(req.Args[i]) //[1]
+		args[i] = reflect.ValueOf(params[i]) //[1]
 	}
 
 	//start call
@@ -40,10 +33,10 @@ func (handler *RPCServerHandler) Handle(req data.RPCData) data.RPCData {
 	}
 
 	//error
-	var err string
+	var err error
 	if _, ok := result[len(result)-1].Interface().(error); ok {
-		err = result[len(result)-1].Interface().(error).Error()
+		err = result[len(result)-1].Interface().(error)
 	}
 
-	return data.RPCData{Name: req.Name, Args: resArgs, Err: err}
+	return resArgs, err
 }
