@@ -3,7 +3,6 @@ package protocol
 import (
 	"bytes"
 	"github.com/skyhackvip/service_rpc/codec"
-	"github.com/skyhackvip/service_rpc/config"
 	"testing"
 )
 
@@ -23,12 +22,10 @@ func TestMsg(t *testing.T) {
 
 	req.ServiceClass = "User"
 	req.ServiceMethod = "getUserById"
-
-	//req.Payload = []byte(`{"a":1, "b":2,}`)
-	payload := map[string]int{"a": 1, "b": 2}
-	coder := codec.New(config.CODEC_GOB)
-	encodePayload, _ := coder.Encode(payload)
-	req.Payload = encodePayload
+	data := map[string]int{"a": 1, "b": 2}
+	coder := codec.GobCodec{}
+	payload, _ := coder.Encode(data)
+	req.Payload = payload
 
 	var buf bytes.Buffer
 	a, err := req.Send(&buf)
@@ -47,12 +44,4 @@ func TestMsg(t *testing.T) {
 	rs := make(map[string]int, 0)
 	err = coder.Decode(res.Payload, &rs)
 	t.Log(rs, err)
-
 }
-
-/*
-func TestConvert(t *testing.T) {
-	s := "{aabbcdsfdsf}"
-	t.Log(stringToByte(s))
-	t.Log([]byte(s))
-}*/

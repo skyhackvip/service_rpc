@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"fmt"
 	"reflect"
 )
 
@@ -16,22 +15,16 @@ type RPCServerHandler struct {
 
 //call local service
 func (handler *RPCServerHandler) Handle(method string, params []interface{}) ([]interface{}, error) {
-	fmt.Println("handler")
 	//get arguments if params is not empty
 	args := make([]reflect.Value, len(params))
 	for i := range params {
-		//reflect.TypeOf(req.Args[i])  //[]interface{}
 		args[i] = reflect.ValueOf(params[i]) //[1]
 	}
-	fmt.Println(args)
 
 	//get method
-	fmt.Println(handler.class)
 	reflectMethod := handler.class.MethodByName(method)
-	fmt.Println(method, reflectMethod)
 
 	result := reflectMethod.Call(args)
-	fmt.Println(result)
 
 	resArgs := make([]interface{}, len(result))
 	for i := 0; i < len(result); i++ {

@@ -4,23 +4,11 @@ import (
 	"bytes"
 	"encoding/gob"
 	"encoding/json"
-	"github.com/skyhackvip/service_rpc/config"
 )
 
 type Codec interface {
 	Encode(i interface{}) ([]byte, error)
 	Decode(data []byte, i interface{}) error
-}
-
-func New(mode config.CodecMode) Codec {
-	switch mode {
-	case config.CODEC_GOB:
-		return &GobCodec{}
-	case config.CODEC_JSON:
-		return &JSONCodec{}
-	default:
-		return &GobCodec{}
-	}
 }
 
 type JSONCodec struct{}

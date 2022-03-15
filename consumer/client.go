@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/skyhackvip/service_rpc/codec"
 	"github.com/skyhackvip/service_rpc/config"
+	"github.com/skyhackvip/service_rpc/global"
 	"github.com/skyhackvip/service_rpc/protocol"
 	"log"
 	"net"
@@ -70,7 +70,7 @@ func (cli *RPCClient) Close() {
 func (cli *RPCClient) makeCall(service *Service, methodPtr interface{}) {
 	log.Printf("----start call:%s.%s----\n", service.Class, service.Method)
 	container := reflect.ValueOf(methodPtr).Elem() //反射获取函数元素
-	coder := codec.New(config.CODEC_GOB)
+	coder := global.Codecs[cli.option.SerializeType]
 
 	handler := func(req []reflect.Value) []reflect.Value {
 		//出参个数

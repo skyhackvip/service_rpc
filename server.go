@@ -35,6 +35,7 @@ func init() {
 }
 
 func main() {
+	flag.Parse()
 	if ip == "" || port == 0 {
 		panic("init ip and port error")
 	}

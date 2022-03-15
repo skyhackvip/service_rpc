@@ -2,8 +2,8 @@ package provider
 
 import (
 	"fmt"
-	"github.com/skyhackvip/service_rpc/codec"
 	"github.com/skyhackvip/service_rpc/config"
+	"github.com/skyhackvip/service_rpc/global"
 	"github.com/skyhackvip/service_rpc/protocol"
 	"io"
 	"log"
@@ -66,14 +66,9 @@ func (l *RPCListener) Run() {
 //handle each connection
 //TODO:对异常 err 处理
 func (l *RPCListener) handleConn(conn net.Conn) {
-	fmt.Println()
-	log.Println("---- handle conn ----")
-
 	defer catchPanic()
 
 	for {
-		log.Println("---- loop start ----")
-
 		//read from network
 		msg, err := l.receiveData(conn)
 		if err != nil || msg == nil {
@@ -81,7 +76,10 @@ func (l *RPCListener) handleConn(conn net.Conn) {
 		}
 
 		//decode
-		coder := codec.New(config.CODEC_GOB) //msg.Header.SerializeType()) //get from cache
+		coder := global.Codecs[msg.Header.SerializeType()] //get from cache
+		if coder == nil {
+			return
+		}
 		inArgs := make([]interface{}, 0)
 		err = coder.Decode(msg.Payload, &inArgs) //rpcdata
 		if err != nil {
@@ -96,7 +94,6 @@ func (l *RPCListener) handleConn(conn net.Conn) {
 			log.Println("can not found handler")
 			return
 		}
-		log.Println("1111111111", msg.ServiceClass, handler)
 		result, err := handler.Handle(msg.ServiceMethod, inArgs)
 		log.Println("call local service finish! result:", result)
 

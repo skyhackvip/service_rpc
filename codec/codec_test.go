@@ -1,7 +1,6 @@
 package codec
 
 import (
-	"github.com/skyhackvip/service_rpc/config"
 	"testing"
 )
 
@@ -26,18 +25,15 @@ func TestJsonCodec(t *testing.T) {
 }
 
 func TestGobCodec(t *testing.T) {
-	/*u := User{Id: 1,
+	u := User{Id: 1,
 		Name:   "Kavin",
 		Habbit: []string{"coding", "touring"},
-	}*/
-	a := map[string]int{"a": 1, "b": 2}
-	//codec := GobCodec{}
-	coder := New(config.CODEC_GOB)
-	b, err := coder.Encode(a)
+	}
+	coder := GobCodec{}
+	b, err := coder.Encode(u)
 	t.Log(b, err)
 
-	//ur := User{}
-	ur := make(map[string]int, 0)
+	ur := User{}
 	err = coder.Decode(b, &ur)
 	t.Log(ur, err)
 }
