@@ -45,11 +45,9 @@ func main() {
 	//register local service
 	srv.RegisterName("User", &UserHandler{})
 	srv.RegisterName("Test", &TestHandler{})
-	srv.RegisterName("Order", &OrderHandler{})
 
 	//register gob
 	gob.Register(User{})
-	gob.Register(Order{})
 
 	go srv.Run()
 
@@ -97,21 +95,4 @@ func (u *UserHandler) GetUserById(id int) (User, error) {
 		return u, nil
 	}
 	return User{}, fmt.Errorf("id %d not found", id)
-}
-
-type OrderHandler struct{}
-
-type Order struct {
-	OrderNo string
-	Amount  float32
-	Uid     int
-}
-
-//必须大写
-func (o *OrderHandler) GetOrder(id int) Order {
-	return Order{
-		OrderNo: "123567",
-		Amount:  100.08,
-		Uid:     8,
-	}
 }

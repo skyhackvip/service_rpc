@@ -28,7 +28,7 @@ type Option struct {
 
 var DefaultOption = Option{
 	Retries:           3,
-	ConnectionTimeout: 60 * time.Second,
+	ConnectionTimeout: 5 * time.Second,
 	SerializeType:     protocol.Gob,
 	CompressType:      protocol.None,
 }
@@ -52,10 +52,8 @@ func (cli *RPCClient) Connect(addr string) error {
 }
 
 func (cli *RPCClient) Invoke(ctx context.Context, service *Service, stub interface{}, params ...interface{}) (interface{}, error) {
-
 	//make func : this step can be prepared before invoke and store into cache
 	cli.makeCall(service, stub)
-
 	//reflect call
 	return cli.wrapCall(ctx, stub, params...)
 }
@@ -107,7 +105,7 @@ func (cli *RPCClient) makeCall(service *Service, methodPtr interface{}) {
 		msg.ServiceClass = service.Class
 		msg.ServiceMethod = service.Method
 		msg.Payload = payload
-		_, err = msg.Send(cli.conn)
+		err = msg.Send(cli.conn)
 		if err != nil {
 			log.Printf("send err:%v\n", err)
 			return errorHandler(err)

@@ -3,8 +3,8 @@ package protocol
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/skyhackvip/service_rpc/util"
 	"io"
-	"unsafe"
 )
 
 const (
@@ -27,57 +27,57 @@ func NewRPCMsg() *RPCMsg {
 	}
 }
 
-func (msg *RPCMsg) Send(writer io.Writer) (int64, error) {
+func (msg *RPCMsg) Send(writer io.Writer) error {
 	//send header
-	h, err := writer.Write(msg.Header[:])
+	_, err := writer.Write(msg.Header[:])
 	if err != nil {
-		return int64(h), err
+		return err
 	}
 
 	//write body total len :4 byte
 	dataLen := SPLIT_LEN + len(msg.ServiceClass) + SPLIT_LEN + len(msg.ServiceMethod) + SPLIT_LEN + len(msg.Payload)
 	err = binary.Write(writer, binary.BigEndian, uint32(dataLen)) //4
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	//write service class len :4 byte
 	err = binary.Write(writer, binary.BigEndian, uint32(len(msg.ServiceClass)))
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	//write service class
-	err = binary.Write(writer, binary.BigEndian, StringToByte(msg.ServiceClass))
+	err = binary.Write(writer, binary.BigEndian, util.StringToByte(msg.ServiceClass))
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	//write service method len :4 byte
 	err = binary.Write(writer, binary.BigEndian, uint32(len(msg.ServiceMethod)))
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	//write service method
-	err = binary.Write(writer, binary.BigEndian, StringToByte(msg.ServiceMethod))
+	err = binary.Write(writer, binary.BigEndian, util.StringToByte(msg.ServiceMethod))
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	//write payload len :4 byte
 	err = binary.Write(writer, binary.BigEndian, uint32(len(msg.Payload)))
 	if err != nil {
-		return 0, err
+		return err
 	}
 
 	//write payload
 	//err = binary.Write(writer, binary.BigEndian, msg.Payload)
-	nc, err := writer.Write(msg.Payload)
+	_, err = writer.Write(msg.Payload)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	return int64(nc), nil
+	return nil
 }
 
 func (msg *RPCMsg) Decode(r io.Reader) error {
@@ -107,7 +107,7 @@ func (msg *RPCMsg) Decode(r io.Reader) error {
 	//service class
 	start = end
 	end = start + int(classLen)
-	msg.ServiceClass = ByteToString(data[start:end]) //4,x
+	msg.ServiceClass = util.ByteToString(data[start:end]) //4,x
 
 	//service method len
 	start = end
@@ -117,7 +117,7 @@ func (msg *RPCMsg) Decode(r io.Reader) error {
 	//service method
 	start = end
 	end = start + int(methodLen)
-	msg.ServiceMethod = ByteToString(data[start:end]) //x+4, x+4+y
+	msg.ServiceMethod = util.ByteToString(data[start:end]) //x+4, x+4+y
 
 	//payload len
 	start = end
@@ -137,14 +137,4 @@ func Read(r io.Reader) (*RPCMsg, error) {
 		return nil, err
 	}
 	return msg, nil
-}
-
-func StringToByte(s string) []byte {
-	r := (*[2]uintptr)(unsafe.Pointer(&s))
-	k := [3]uintptr{r[0], r[1], r[1]}
-	return *(*[]byte)(unsafe.Pointer(&k))
-}
-
-func ByteToString(b []byte) string {
-	return *(*string)(unsafe.Pointer(&b))
 }

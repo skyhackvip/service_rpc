@@ -132,8 +132,7 @@ func (l *RPCListener) sendData(conn net.Conn, payload []byte) error {
 	resMsg.SetCompressType(protocol.None)
 	resMsg.SetSerializeType(protocol.Gob)
 	resMsg.Payload = payload
-	_, err := resMsg.Send(conn)
-	return err
+	return resMsg.Send(conn)
 }
 
 func (l *RPCListener) Close() {

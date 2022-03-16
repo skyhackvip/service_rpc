@@ -12,7 +12,7 @@ type Service struct {
 	Addrs  []string
 }
 
-//demo: user_service.user.GetUser
+//demo: UserService.User.GetUserById
 func NewService(servicePath string) (*Service, error) {
 	arr := strings.Split(servicePath, ".")
 	service := &Service{}
