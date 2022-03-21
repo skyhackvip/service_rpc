@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"github.com/skyhackvip/service_rpc/provider"
-	"github.com/skyhackvip/service_rpc/util"
 	"log"
 	"os"
 	"os/signal"
@@ -25,8 +24,8 @@ func init() {
 	if hostname, err := os.Hostname(); err != nil || hostname == "" {
 		hostname = os.Getenv("HOSTNAME") //system enviorment
 	}
-	if ip = util.InternalIP(); ip == "" {
-		ip = os.Getenv("IP")
+	if ip = os.Getenv("IP"); ip == "" {
+		ip = "localhost"
 	}
 	flag.StringVar(&appid, "appid", os.Getenv("APPID"), "appid required")
 	flag.StringVar(&env, "env", os.Getenv("ENV"), "env required")

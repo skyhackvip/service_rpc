@@ -26,5 +26,5 @@ func NewService(servicePath string) (*Service, error) {
 }
 
 func (service *Service) SelectAddr() string {
-	return "10.12.33.101:8811"
+	return "localhost:8811"
 }
