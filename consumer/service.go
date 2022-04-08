@@ -2,7 +2,9 @@ package consumer
 
 import (
 	"errors"
+	"math/rand"
 	"strings"
+	"time"
 )
 
 type Service struct {
@@ -26,5 +28,7 @@ func NewService(servicePath string) (*Service, error) {
 }
 
 func (service *Service) SelectAddr() string {
-	return "localhost:8811"
+	rand.Seed(time.Now().Unix())
+	return service.Addrs[rand.Intn(len(service.Addrs))]
+	//return "localhost:8811"
 }

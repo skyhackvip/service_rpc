@@ -4,12 +4,17 @@ import (
 	"context"
 	"encoding/gob"
 	"github.com/skyhackvip/service_rpc/consumer"
+	"github.com/skyhackvip/service_rpc/naming"
 	"log"
 )
 
 func main() {
+	nodes := []string{"localhost:8881"}
+	conf := &naming.Config{Nodes: nodes, Env: "dev"}
+	discovery := naming.New(conf)
+
 	gob.Register(User{})
-	cli := consumer.NewClientProxy(consumer.DefaultOption)
+	cli := consumer.NewClientProxy(consumer.DefaultOption, discovery)
 	ctx := context.Background()
 
 	var GetUserById func(id int) (User, error)

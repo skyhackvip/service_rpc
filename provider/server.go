@@ -1,6 +1,8 @@
 package provider
 
 import (
+	"context"
+	"github.com/skyhackvip/service_rpc/naming"
 	"log"
 	"reflect"
 )
@@ -11,13 +13,27 @@ type Server interface {
 	Close()
 }
 
-type RPCServer struct {
-	listener Listener //*Listener is error
+type Option struct {
+	Ip       string
+	Port     int
+	Hostname string
+	AppId    string
+	Env      string
 }
 
-func NewRPCServer(ip string, port int) *RPCServer {
+var DefaultOption = Option{}
+
+type RPCServer struct {
+	listener Listener //*Listener is error
+	registry naming.Registry
+	option   Option
+}
+
+func NewRPCServer(option Option, registry naming.Registry) *RPCServer {
 	return &RPCServer{
-		listener: NewRPCListener(ip, port),
+		listener: NewRPCListener(option.Ip, option.Port),
+		registry: registry,
+		option:   option,
 	}
 }
 
@@ -36,6 +52,8 @@ func (svr *RPCServer) RegisterName(name string, class interface{}) {
 //service start
 func (svr *RPCServer) Run() {
 	go svr.listener.Run()
+	//register in registry
+	svr.registerToCenter()
 }
 
 //service stop
@@ -43,4 +61,14 @@ func (svr *RPCServer) Close() {
 	if svr.listener != nil {
 		svr.listener.Close()
 	}
+}
+
+func (svr *RPCServer) registerToCenter() {
+	instance := &naming.Instance{
+		Env:      svr.option.Env,
+		AppId:    svr.option.AppId,
+		Hostname: svr.option.Hostname,
+		Addrs:    svr.listener.GetAddrs(),
+	}
+	svr.registry.Register(context.Background(), instance)
 }

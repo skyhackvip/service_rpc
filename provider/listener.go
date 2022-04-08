@@ -14,6 +14,7 @@ type Listener interface {
 	Run()
 	SetHandler(string, Handler)
 	Close()
+	GetAddrs() []string
 }
 
 //base on tcp
@@ -41,7 +42,7 @@ func (l *RPCListener) SetHandler(name string, handler Handler) {
 
 //start listening and waiting for connection
 func (l *RPCListener) Run() {
-	//listen on port by tcp
+	//listen on port by tcp TODO
 	addr := fmt.Sprintf("%s:%d", l.ServiceIp, l.ServicePort)
 	nl, err := net.Listen(config.NET_TRANS_PROTOCOL, addr)
 	if err != nil {
@@ -139,6 +140,11 @@ func (l *RPCListener) Close() {
 	if l.nl != nil {
 		l.nl.Close()
 	}
+}
+
+func (l *RPCListener) GetAddrs() []string {
+	addr := fmt.Sprintf("tcp://%s:%d", l.ServiceIp, l.ServicePort)
+	return []string{addr}
 }
 
 func catchPanic() {

@@ -22,8 +22,8 @@ const (
 
 const (
 	Appid          = ""
-	NodeInterval   = 2 * time.Second
-	_renewInterval = 2 * time.Second
+	NodeInterval   = 60 * time.Second
+	_renewInterval = 60 * time.Second
 )
 
 type Config struct {
@@ -65,7 +65,7 @@ func New(conf *Config) *Discovery {
 	return dis
 }
 
-func (dis *Discovery) Register(instance *Instance) (context.CancelFunc, error) {
+func (dis *Discovery) Register(ctx context.Context, instance *Instance) (context.CancelFunc, error) {
 	var err error
 	//check local cache
 	dis.mutex.Lock()
@@ -128,7 +128,6 @@ func (dis *Discovery) register(instance *Instance) error {
 	params["addrs"] = instance.Addrs
 	params["version"] = instance.Version
 	params["status"] = 1
-	log.Println(params)
 	resp, err := HttpPost(uri, params) //ctx
 	if err != nil {
 		log.Println(err)
@@ -140,7 +139,6 @@ func (dis *Discovery) register(instance *Instance) error {
 		log.Println(err)
 		return err
 	}
-	log.Println(res)
 	if res.Code != 200 {
 		log.Printf("uri is (%v), response code (%v)\n", uri, res.Code)
 		return errors.New("conflict")
@@ -269,15 +267,45 @@ func (dis *Discovery) pickNode() string {
 	return nodes[dis.idx%uint64(len(nodes))]
 }
 
-func (dis *Discovery) Fetch(ctx context.Context, appId string) (map[string][]*FetchData, bool) {
+func (dis *Discovery) Fetch(ctx context.Context, appId string) ([]*Instance, bool) {
 	//from local
 	dis.mutex.RLock()
-	_, ok := dis.apps[appId]
+	fetchData, ok := dis.apps[appId]
 	dis.mutex.RUnlock()
 	if ok {
+		log.Println("get data from local memory, appid:" + appId)
+		return fetchData.Instances, ok
+	}
+	//from remote
+	uri := fmt.Sprintf(_fetchURL, dis.pickNode())
+	params := make(map[string]interface{})
+	params["env"] = dis.conf.Env
+	params["appid"] = appId
+	params["status"] = 1 //up
+	log.Println(params)
+	resp, err := HttpPost(uri, params)
+	res := ResponseFetch{}
+	err = json.Unmarshal([]byte(resp), &res)
+	if err != nil {
+		log.Println(err)
+		return nil, false
+	}
+	var result []*Instance
+	for _, ins := range res.Data.Instances {
+		result = append(result, ins)
 
 	}
-	return nil, ok
+	if len(result) > 0 {
+		ok = true
+		dis.mutex.Lock()
+		dis.apps[appId] = &res.Data
+		dis.mutex.Unlock()
+	}
+	return result, ok
+}
+
+func (dis *Discovery) Close() error {
+	return nil
 }
 
 type Response struct {

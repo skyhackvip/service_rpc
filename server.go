@@ -4,6 +4,7 @@ import (
 	"encoding/gob"
 	"flag"
 	"fmt"
+	"github.com/skyhackvip/service_rpc/naming"
 	"github.com/skyhackvip/service_rpc/provider"
 	"log"
 	"os"
@@ -39,7 +40,19 @@ func main() {
 		panic("init ip and port error")
 	}
 
-	srv := provider.NewRPCServer(ip, port)
+	nodes := []string{"localhost:8881"}
+	conf := &naming.Config{Nodes: nodes, Env: env}
+	discovery := naming.New(conf)
+
+	option := provider.Option{
+		Ip:       ip,
+		Port:     port,
+		Hostname: hostname,
+		Env:      env,
+		AppId:    appid,
+	}
+
+	srv := provider.NewRPCServer(option, discovery)
 
 	//register local service
 	srv.RegisterName("User", &UserHandler{})
