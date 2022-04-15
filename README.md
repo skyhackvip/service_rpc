@@ -2,7 +2,7 @@
 
 - 服务端启动
 ```
-PORT=8811 APPID=user ENV=dev go run server.go
+PORT=8811 APPID=UserService ENV=dev go run server.go
 ```
 
 - 客户端测试

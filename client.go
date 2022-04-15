@@ -33,9 +33,11 @@ func main() {
 	log.Println("result:", w)
 
 	var Login func(string, string) bool
-	cli.Call(ctx, "UserService.User.Login", &Login)
-	v := Login("kavin", "123456")
-	log.Println("result:", v)
+	for {
+		cli.Call(ctx, "UserService.User.Login", &Login)
+		v := Login("kavin", "123456")
+		log.Println("result:", v)
+	}
 }
 
 type User struct {

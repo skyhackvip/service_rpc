@@ -5,6 +5,7 @@ import (
 	"github.com/skyhackvip/service_rpc/naming"
 	"log"
 	"reflect"
+	"time"
 )
 
 type Server interface {
@@ -14,14 +15,21 @@ type Server interface {
 }
 
 type Option struct {
-	Ip       string
-	Port     int
-	Hostname string
-	AppId    string
-	Env      string
+	Ip           string
+	Port         int
+	Hostname     string
+	AppId        string
+	Env          string
+	NetProtocol  string
+	ReadTimeout  time.Duration
+	WriteTimeout time.Duration
 }
 
-var DefaultOption = Option{}
+var DefaultOption = Option{
+	NetProtocol:  "tcp",
+	ReadTimeout:  5 * time.Millisecond,
+	WriteTimeout: 5 * time.Millisecond,
+}
 
 type RPCServer struct {
 	listener Listener //*Listener is error
@@ -31,7 +39,7 @@ type RPCServer struct {
 
 func NewRPCServer(option Option, registry naming.Registry) *RPCServer {
 	return &RPCServer{
-		listener: NewRPCListener(option.Ip, option.Port),
+		listener: NewRPCListener(option),
 		registry: registry,
 		option:   option,
 	}

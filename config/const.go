@@ -1,9 +1,8 @@
 package config
 
 const (
-	NET_TRANS_PROTOCOL = "tcp"
-	TRANS_TYPE         = "gob" //json
-	HEADER_LEN         = 4     //header length
+	TRANS_TYPE = "gob" //json
+	HEADER_LEN = 4     //header length
 )
 
 type CodecMode int

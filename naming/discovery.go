@@ -120,7 +120,7 @@ func (dis *Discovery) Register(ctx context.Context, instance *Instance) (context
 
 func (dis *Discovery) register(instance *Instance) error {
 	uri := fmt.Sprintf(_registerURL, dis.pickNode())
-	log.Println("request register url:" + uri)
+	log.Println("discovery - request register url:" + uri)
 	params := make(map[string]interface{})
 	params["env"] = dis.conf.Env
 	params["appid"] = instance.AppId
@@ -148,7 +148,7 @@ func (dis *Discovery) register(instance *Instance) error {
 
 func (dis *Discovery) renew(instance *Instance) error {
 	uri := fmt.Sprintf(_renewURL, dis.pickNode())
-	log.Println("request renew url:" + uri)
+	log.Println("discovery - request renew url:" + uri)
 	params := make(map[string]interface{})
 	params["env"] = dis.conf.Env
 	params["appid"] = instance.AppId
@@ -174,7 +174,7 @@ func (dis *Discovery) renew(instance *Instance) error {
 
 func (dis *Discovery) cancel(instance *Instance) error {
 	uri := fmt.Sprintf(_renewURL, dis.pickNode())
-	log.Println("request cancel url:" + uri)
+	log.Println("discovery - request cancel url:" + uri)
 	params := make(map[string]interface{})
 	params["env"] = dis.conf.Env
 	params["appid"] = instance.AppId
@@ -206,7 +206,7 @@ func (dis *Discovery) updateNode() {
 		select {
 		case <-ticker.C:
 			uri := fmt.Sprintf(_nodesURL, dis.pickNode())
-			log.Println("request and update node, url:" + uri)
+			log.Println("discovery - request and update node, url:" + uri)
 			params := make(map[string]interface{})
 			params["env"] = dis.conf.Env
 			resp, err := HttpPost(uri, params)
