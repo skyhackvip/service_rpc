@@ -24,6 +24,7 @@ type Option struct {
 	ConnectionTimeout time.Duration
 	SerializeType     protocol.SerializeType
 	CompressType      protocol.CompressType
+	NetProtocol       string
 }
 
 var DefaultOption = Option{
@@ -31,6 +32,7 @@ var DefaultOption = Option{
 	ConnectionTimeout: 5 * time.Second,
 	SerializeType:     protocol.Gob,
 	CompressType:      protocol.None,
+	NetProtocol:       "tcp",
 }
 
 type RPCClient struct {
@@ -43,7 +45,7 @@ func NewClient(option Option) Client {
 }
 
 func (cli *RPCClient) Connect(addr string) error {
-	conn, err := net.DialTimeout(config.NET_TRANS_PROTOCOL, addr, cli.option.ConnectionTimeout)
+	conn, err := net.DialTimeout(cli.option.NetProtocol, addr, cli.option.ConnectionTimeout)
 	if err != nil {
 		return err
 	}

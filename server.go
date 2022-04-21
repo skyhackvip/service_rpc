@@ -36,8 +36,9 @@ func init() {
 
 func main() {
 	flag.Parse()
-	if ip == "" || port == 0 {
-		panic("init ip and port error")
+	log.Println(ip, port, env, appid)
+	if ip == "" || port == 0 || env == "" || appid == "" {
+		panic("init ip,port,env,appid error")
 	}
 
 	nodes := []string{"localhost:8881"}
@@ -45,11 +46,14 @@ func main() {
 	discovery := naming.New(conf)
 
 	option := provider.Option{
-		Ip:       ip,
-		Port:     port,
-		Hostname: hostname,
-		Env:      env,
-		AppId:    appid,
+		Ip:           ip,
+		Port:         port,
+		Hostname:     hostname,
+		Env:          env,
+		AppId:        appid,
+		NetProtocol:  provider.DefaultOption.NetProtocol,
+		ReadTimeout:  provider.DefaultOption.ReadTimeout,
+		WriteTimeout: provider.DefaultOption.WriteTimeout,
 	}
 
 	srv := provider.NewRPCServer(option, discovery)
