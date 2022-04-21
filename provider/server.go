@@ -12,6 +12,7 @@ type Server interface {
 	Register(string, interface{}) //error
 	Run()
 	Close()
+	Shutdown()
 }
 
 type Option struct {
@@ -32,9 +33,10 @@ var DefaultOption = Option{
 }
 
 type RPCServer struct {
-	listener Listener //*Listener is error
-	registry naming.Registry
-	option   Option
+	listener   Listener //*Listener is error
+	registry   naming.Registry
+	cancelFunc context.CancelFunc
+	option     Option
 }
 
 func NewRPCServer(option Option, registry naming.Registry) *RPCServer {
@@ -60,23 +62,44 @@ func (svr *RPCServer) RegisterName(name string, class interface{}) {
 //service start
 func (svr *RPCServer) Run() {
 	go svr.listener.Run()
-	//register in registry
-	svr.registerToCenter()
+	//register in discovery
+	svr.registerToNaming()
 }
 
-//service stop
+//service close
 func (svr *RPCServer) Close() {
+	log.Println("close and cancel")
 	if svr.listener != nil {
 		svr.listener.Close()
 	}
+	svr.cancelFunc()
 }
 
-func (svr *RPCServer) registerToCenter() {
+//service shutdown gracefully
+func (svr *RPCServer) Shutdown() {
+	log.Println("shutdown and cancel")
+	if svr.listener != nil {
+		svr.listener.Shutdown()
+	}
+	svr.cancelFunc()
+}
+
+func (svr *RPCServer) registerToNaming() error {
 	instance := &naming.Instance{
 		Env:      svr.option.Env,
 		AppId:    svr.option.AppId,
 		Hostname: svr.option.Hostname,
 		Addrs:    svr.listener.GetAddrs(),
 	}
-	svr.registry.Register(context.Background(), instance)
+	cancel, err := svr.registry.Register(context.Background(), instance)
+	if err != nil {
+		log.Println("register to naming error", err)
+		return err
+	}
+	svr.cancelFunc = cancel
+	return nil
+}
+
+func (svr *RPCServer) cancelToCenter() {
+
 }

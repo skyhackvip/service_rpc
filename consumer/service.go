@@ -27,8 +27,8 @@ func NewService(servicePath string) (*Service, error) {
 	return service, nil
 }
 
+//selector: random rb weight
 func (service *Service) SelectAddr() string {
 	rand.Seed(time.Now().Unix())
 	return service.Addrs[rand.Intn(len(service.Addrs))]
-	//return "localhost:8811"
 }

@@ -17,6 +17,7 @@ type Listener interface {
 	SetHandler(string, Handler)
 	Close()
 	GetAddrs() []string
+	Shutdown()
 }
 
 //base on tcp

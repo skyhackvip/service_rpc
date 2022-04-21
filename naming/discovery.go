@@ -21,9 +21,8 @@ const (
 )
 
 const (
-	Appid          = ""
-	NodeInterval   = 60 * time.Second
-	_renewInterval = 60 * time.Second
+	NodeInterval  = 30 * time.Second
+	RenewInterval = 30 * time.Second
 )
 
 type Config struct {
@@ -98,7 +97,7 @@ func (dis *Discovery) Register(ctx context.Context, instance *Instance) (context
 
 	//renew&cancel
 	go func() {
-		ticker := time.NewTicker(_renewInterval)
+		ticker := time.NewTicker(RenewInterval)
 		defer ticker.Stop()
 		for {
 			select {
@@ -113,9 +112,7 @@ func (dis *Discovery) Register(ctx context.Context, instance *Instance) (context
 		}
 
 	}()
-
 	return cancelFunc, nil
-
 }
 
 func (dis *Discovery) register(instance *Instance) error {
@@ -173,7 +170,8 @@ func (dis *Discovery) renew(instance *Instance) error {
 }
 
 func (dis *Discovery) cancel(instance *Instance) error {
-	uri := fmt.Sprintf(_renewURL, dis.pickNode())
+	//local cache
+	uri := fmt.Sprintf(_cancelURL, dis.pickNode())
 	log.Println("discovery - request cancel url:" + uri)
 	params := make(map[string]interface{})
 	params["env"] = dis.conf.Env
@@ -305,6 +303,7 @@ func (dis *Discovery) Fetch(ctx context.Context, appId string) ([]*Instance, boo
 }
 
 func (dis *Discovery) Close() error {
+	//todo close myself
 	return nil
 }
 
