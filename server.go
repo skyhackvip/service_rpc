@@ -22,13 +22,11 @@ var (
 )
 
 func init() {
-	if hostname, err := os.Hostname(); err != nil || hostname == "" {
-		hostname = os.Getenv("HOSTNAME") //system enviorment
-	}
 	if ip = os.Getenv("IP"); ip == "" {
 		ip = "localhost"
 	}
 	flag.StringVar(&appid, "appid", os.Getenv("APPID"), "appid required")
+	flag.StringVar(&hostname, "hostname", os.Getenv("HOSTNAME"), "hostname required")
 	flag.StringVar(&env, "env", os.Getenv("ENV"), "env required")
 	port, _ = strconv.Atoi(os.Getenv("PORT"))
 	flag.IntVar(&port, "port", port, "port required")
@@ -36,9 +34,8 @@ func init() {
 
 func main() {
 	flag.Parse()
-	log.Println(ip, port, env, appid)
-	if ip == "" || port == 0 || env == "" || appid == "" {
-		panic("init ip,port,env,appid error")
+	if ip == "" || port == 0 || env == "" || appid == "" || hostname == "" {
+		panic("init ip,port,env,appid,hostname error")
 	}
 
 	nodes := []string{"localhost:8881"}
