@@ -28,8 +28,8 @@ type Option struct {
 
 var DefaultOption = Option{
 	NetProtocol:  "tcp",
-	ReadTimeout:  5 * time.Millisecond,
-	WriteTimeout: 5 * time.Millisecond,
+	ReadTimeout:  15 * time.Millisecond,
+	WriteTimeout: 15 * time.Millisecond,
 }
 
 type RPCServer struct {
@@ -37,6 +37,7 @@ type RPCServer struct {
 	registry   naming.Registry
 	cancelFunc context.CancelFunc
 	option     Option
+	Plugins    PluginContainer
 }
 
 func NewRPCServer(option Option, registry naming.Registry) *RPCServer {
@@ -44,6 +45,7 @@ func NewRPCServer(option Option, registry naming.Registry) *RPCServer {
 		listener: NewRPCListener(option),
 		registry: registry,
 		option:   option,
+		Plugins:  &pluginContainer{},
 	}
 }
 
@@ -56,11 +58,13 @@ func (svr *RPCServer) Register(class interface{}) {
 func (svr *RPCServer) RegisterName(name string, class interface{}) {
 	handler := &RPCServerHandler{class: reflect.ValueOf(class)}
 	svr.listener.SetHandler(name, handler)
+	svr.Plugins.RegisterHook(name, class)
 	log.Printf("%s registered success!\n", name)
 }
 
 //service start
 func (svr *RPCServer) Run() {
+	svr.listener.SetPlugins(svr.Plugins)
 	go svr.listener.Run()
 	//register in discovery
 	svr.registerToNaming()
@@ -98,8 +102,4 @@ func (svr *RPCServer) registerToNaming() error {
 	}
 	svr.cancelFunc = cancel
 	return nil
-}
-
-func (svr *RPCServer) cancelToCenter() {
-
 }

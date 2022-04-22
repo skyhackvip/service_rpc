@@ -15,6 +15,7 @@ import (
 type Listener interface {
 	Run()
 	SetHandler(string, Handler)
+	SetPlugins(PluginContainer)
 	Close()
 	GetAddrs() []string
 	Shutdown()
@@ -25,6 +26,7 @@ type RPCListener struct {
 	ServiceIp   string
 	ServicePort int
 	option      Option
+	Plugins     PluginContainer
 	Handlers    map[string]Handler
 	nl          net.Listener
 	doneChan    chan struct{} //控制结束
@@ -39,6 +41,10 @@ func NewRPCListener(option Option) *RPCListener {
 		Handlers:    make(map[string]Handler),
 		doneChan:    make(chan struct{}),
 	}
+}
+
+func (l *RPCListener) SetPlugins(plugins PluginContainer) {
+	l.Plugins = plugins
 }
 
 func (l *RPCListener) SetHandler(name string, handler Handler) {
@@ -84,7 +90,11 @@ func (l *RPCListener) Run() { //return
 		}
 
 		//plugin aop
-
+		conn, ok := l.Plugins.ConnAcceptHook(conn)
+		if !ok {
+			conn.Close()
+			continue
+		}
 		log.Printf("server accepted conn: %v\n", conn.RemoteAddr().String())
 
 		//create new routine worker each connection
@@ -151,7 +161,10 @@ func (l *RPCListener) handleConn(conn net.Conn) {
 			log.Println("server can not found handler")
 			return
 		}
+
+		l.Plugins.BeforeCallHook(msg.ServiceClass, msg.ServiceMethod, inArgs) //ctx
 		result, err := handler.Handle(msg.ServiceMethod, inArgs)
+		l.Plugins.AfterCallHook(msg.ServiceClass, msg.ServiceMethod, inArgs, result, err)
 		log.Println("server call local service finish! result:", result)
 
 		//encode
@@ -166,25 +179,47 @@ func (l *RPCListener) handleConn(conn net.Conn) {
 			conn.SetWriteDeadline(startTime.Add(l.option.WriteTimeout))
 		}
 
+		l.Plugins.BeforeWriteHook(encodeRes)
 		err = l.sendData(conn, encodeRes)
+		l.Plugins.AfterWriteHook(encodeRes, err)
 		if err != nil {
-			log.Printf("server send err:%v\n", err)
+			log.Printf("server send err:%v\n", err) //timeout
 			return
 		}
-		log.Printf("server send result finish!")
+		log.Printf("server send result finish! total runtime: %v", time.Now().Sub(startTime).Seconds())
 	}
 }
 
 func (l *RPCListener) receiveData(conn net.Conn) (*protocol.RPCMsg, error) {
+	l.Plugins.BeforeReadHook() //ctx
+
 	msg, err := protocol.Read(conn)
+	if err == io.EOF { //close
+		log.Printf("server read finish:%v\n", err)
+		return msg, nil
+	}
+
+	l.Plugins.AfterReadHook(msg, err)
+
 	if err != nil {
-		if err == io.EOF { //close
-			log.Printf("server read finish:%v\n", err)
-			return msg, nil
-		}
 		//rate limit
 		return nil, err
 	}
+
+	//decode
+	/*coder := global.Codecs[msg.Header.SerializeType()] //get from cache
+	if coder == nil {
+		return
+	}
+	inArgs := make([]interface{}, 0)
+	err = coder.Decode(msg.Payload, &inArgs) //rpcdata
+	if err != nil {
+		log.Println("server decode request err:%v\n", err)
+		return
+	}
+	log.Printf("server decode data finish:%v\n", inArgs)
+	*/
+
 	return msg, nil
 }
 

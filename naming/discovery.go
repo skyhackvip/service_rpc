@@ -21,8 +21,8 @@ const (
 )
 
 const (
-	NodeInterval  = 30 * time.Second
-	RenewInterval = 30 * time.Second
+	NodeInterval  = 90 * time.Second
+	RenewInterval = 60 * time.Second
 )
 
 type Config struct {

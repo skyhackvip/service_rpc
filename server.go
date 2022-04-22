@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"github.com/skyhackvip/service_rpc/naming"
 	"github.com/skyhackvip/service_rpc/provider"
+	"github.com/skyhackvip/service_rpc/provider/plugin"
 	"log"
 	"os"
 	"os/signal"
 	"strconv"
 	"syscall"
+	//	"time"
 )
 
 var (
@@ -54,6 +56,14 @@ func main() {
 	}
 
 	srv := provider.NewRPCServer(option, discovery)
+	srv.Plugins.Add(plugin.RegisterPlugin{})
+	srv.Plugins.Add(plugin.ConnPlugin{})
+	srv.Plugins.Add(plugin.BeforeReadPlugin{})
+	srv.Plugins.Add(plugin.AfterReadPlugin{})
+	srv.Plugins.Add(plugin.BeforeCallPlugin{})
+	srv.Plugins.Add(plugin.MonitorPlugin{})
+	srv.Plugins.Add(plugin.BeforeWritePlugin{})
+	srv.Plugins.Add(plugin.AfterWritePlugin{})
 
 	//register local service
 	srv.RegisterName("User", &UserHandler{})
@@ -103,6 +113,7 @@ func (u *UserHandler) Login(name, pass string) bool {
 }
 
 func (u *UserHandler) GetUserById(id int) (User, error) {
+	//time.Sleep(10 * time.Second)
 	log.Println("start to query user", id)
 	if u, ok := userList[id]; ok {
 		return u, nil

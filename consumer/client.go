@@ -22,6 +22,8 @@ type Client interface {
 type Option struct {
 	Retries           int
 	ConnectionTimeout time.Duration
+	ReadTimeout       time.Duration
+	WriteTimeout      time.Duration
 	SerializeType     protocol.SerializeType
 	CompressType      protocol.CompressType
 	NetProtocol       string
@@ -30,6 +32,8 @@ type Option struct {
 var DefaultOption = Option{
 	Retries:           3,
 	ConnectionTimeout: 5 * time.Second,
+	ReadTimeout:       25 * time.Second,
+	WriteTimeout:      25 * time.Second,
 	SerializeType:     protocol.Gob,
 	CompressType:      protocol.None,
 	NetProtocol:       "tcp",
@@ -99,6 +103,10 @@ func (cli *RPCClient) makeCall(service *Service, methodPtr interface{}) {
 		}
 
 		//send by network
+		startTime := time.Now()
+		if cli.option.WriteTimeout != 0 {
+			cli.conn.SetWriteDeadline(startTime.Add(cli.option.WriteTimeout))
+		}
 		msg := protocol.NewRPCMsg()
 		msg.SetVersion(config.Protocol_MsgVersion)
 		msg.SetMsgType(protocol.Request)
@@ -115,6 +123,9 @@ func (cli *RPCClient) makeCall(service *Service, methodPtr interface{}) {
 		log.Println("send success!")
 
 		//read from network
+		if cli.option.ReadTimeout != 0 {
+			cli.conn.SetReadDeadline(startTime.Add(cli.option.ReadTimeout))
+		}
 		respMsg, err := protocol.Read(cli.conn)
 		if err != nil {
 			return errorHandler(err)
