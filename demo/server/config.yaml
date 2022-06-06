@@ -1,0 +1,6 @@
+registry_addrs: ["localhost:8881", "localhost:8882", "localhost:8883"]
+env: "dev"
+ip: "localhost"
+port: 8898
+hostname: "s1"
+appid: "UserService"

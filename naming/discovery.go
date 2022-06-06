@@ -38,7 +38,7 @@ type Discovery struct {
 
 	//local cache
 	mutex    sync.RWMutex
-	apps     map[string]*FetchData
+	apps     map[string]*FetchData //fetch catch
 	registry map[string]struct{}
 
 	//registry center node
@@ -127,7 +127,8 @@ func (dis *Discovery) register(instance *Instance) error {
 	params["status"] = 1
 	resp, err := HttpPost(uri, params) //ctx
 	if err != nil {
-		log.Println(err)
+		dis.switchNode()
+		log.Println("register err: ", err, "url: ", uri)
 		return err
 	}
 	res := Response{}
@@ -137,7 +138,7 @@ func (dis *Discovery) register(instance *Instance) error {
 		return err
 	}
 	if res.Code != 200 {
-		log.Printf("uri is (%v), response code (%v)\n", uri, res.Code)
+		log.Printf("register err, url is (%v), response code (%v)\n", uri, res.Code)
 		return errors.New("conflict")
 	}
 	return nil
@@ -153,7 +154,8 @@ func (dis *Discovery) renew(instance *Instance) error {
 
 	resp, err := HttpPost(uri, params)
 	if err != nil {
-		log.Println(err)
+		dis.switchNode()
+		log.Println("renew err: ", err, "url: ", uri)
 		return err
 	}
 	res := Response{}
@@ -180,7 +182,8 @@ func (dis *Discovery) cancel(instance *Instance) error {
 
 	resp, err := HttpPost(uri, params)
 	if err != nil {
-		log.Println(err)
+		dis.switchNode()
+		log.Println("cancel err: ", err, "url: ", uri)
 		return err
 	}
 	res := Response{}
@@ -209,7 +212,8 @@ func (dis *Discovery) updateNode() {
 			params["env"] = dis.conf.Env
 			resp, err := HttpPost(uri, params)
 			if err != nil {
-				log.Println(err)
+				dis.switchNode()
+				log.Println("update node err: ", err, "url: ", uri)
 				continue
 			}
 			res := ResponseFetch{}
@@ -229,18 +233,17 @@ func (dis *Discovery) updateNode() {
 
 			}
 			curNodes := dis.node.Load().([]string)
-			if !compareNodes(curNodes, newNodes) {
+			if !compareNodes(newNodes, curNodes) {
 				dis.node.Store(newNodes)
-				log.Println("nodes list changed!")
-				log.Println(newNodes)
+				log.Println("nodes list changed!", newNodes)
 			} else {
-				log.Println("nodes list not change")
-				log.Println(curNodes)
+				log.Println("nodes list not change", curNodes)
 			}
 		}
 	}
 }
 
+//有重复串问题
 func compareNodes(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
@@ -265,6 +268,10 @@ func (dis *Discovery) pickNode() string {
 	return nodes[dis.idx%uint64(len(nodes))]
 }
 
+func (dis *Discovery) switchNode() {
+	atomic.AddUint64(&dis.idx, 1)
+}
+
 func (dis *Discovery) Fetch(ctx context.Context, appId string) ([]*Instance, bool) {
 	//from local
 	dis.mutex.RLock()
@@ -280,10 +287,18 @@ func (dis *Discovery) Fetch(ctx context.Context, appId string) ([]*Instance, boo
 	params["env"] = dis.conf.Env
 	params["appid"] = appId
 	params["status"] = 1 //up
-	log.Println(params)
 	resp, err := HttpPost(uri, params)
+	if err != nil {
+		dis.switchNode()
+		log.Println("fetch err: ", err, "url: ", uri)
+		return nil, false
+	}
 	res := ResponseFetch{}
 	err = json.Unmarshal([]byte(resp), &res)
+	if res.Code != 200 {
+		log.Println("discovery code is:", res.Code)
+		return nil, false
+	}
 	if err != nil {
 		log.Println(err)
 		return nil, false

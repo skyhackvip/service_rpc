@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"errors"
 	"github.com/skyhackvip/service_rpc/naming"
 	"log"
 	"reflect"
@@ -41,6 +42,15 @@ type RPCServer struct {
 }
 
 func NewRPCServer(option Option, registry naming.Registry) *RPCServer {
+	if option.NetProtocol == "" {
+		option.NetProtocol = DefaultOption.NetProtocol
+	}
+	if option.ReadTimeout == 0 {
+		option.ReadTimeout = DefaultOption.ReadTimeout
+	}
+	if option.WriteTimeout == 0 {
+		option.WriteTimeout = DefaultOption.WriteTimeout
+	}
 	return &RPCServer{
 		listener: NewRPCListener(option),
 		registry: registry,
@@ -64,15 +74,18 @@ func (svr *RPCServer) RegisterName(name string, class interface{}) {
 
 //service start
 func (svr *RPCServer) Run() {
+	//register in discovery
+	err := svr.registerToNaming()
+	if err != nil {
+		log.Fatal(err)
+	}
 	svr.listener.SetPlugins(svr.Plugins)
 	go svr.listener.Run()
-	//register in discovery
-	svr.registerToNaming()
 }
 
 //service close
 func (svr *RPCServer) Close() {
-	log.Println("close and cancel")
+	log.Println("close and cancel: ", svr.option.AppId, svr.option.Hostname)
 	if svr.listener != nil {
 		svr.listener.Close()
 	}
@@ -81,7 +94,7 @@ func (svr *RPCServer) Close() {
 
 //service shutdown gracefully
 func (svr *RPCServer) Shutdown() {
-	log.Println("shutdown and cancel")
+	log.Println("shutdown and cancel:", svr.option.AppId, svr.option.Hostname)
 	if svr.listener != nil {
 		svr.listener.Shutdown()
 	}
@@ -95,11 +108,15 @@ func (svr *RPCServer) registerToNaming() error {
 		Hostname: svr.option.Hostname,
 		Addrs:    svr.listener.GetAddrs(),
 	}
-	cancel, err := svr.registry.Register(context.Background(), instance)
-	if err != nil {
-		log.Println("register to naming error", err)
-		return err
+	retries := 2
+	for retries > 0 {
+		retries--
+		cancel, err := svr.registry.Register(context.Background(), instance)
+		if err == nil {
+			log.Println("register to naming server success: ", svr.option.AppId, svr.option.Hostname)
+			svr.cancelFunc = cancel
+			return nil
+		}
 	}
-	svr.cancelFunc = cancel
-	return nil
+	return errors.New("register to naming server fail")
 }

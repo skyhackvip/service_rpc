@@ -7,52 +7,32 @@ import (
 	"github.com/skyhackvip/service_rpc/naming"
 	"github.com/skyhackvip/service_rpc/provider"
 	"github.com/skyhackvip/service_rpc/provider/plugin"
+	yaml "gopkg.in/yaml.v2"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	//	"time"
 )
 
-var (
-	hostname string
-	appid    string
-	port     int
-	ip       string
-	env      string
-)
-
-func init() {
-	if ip = os.Getenv("IP"); ip == "" {
-		ip = "localhost"
-	}
-	flag.StringVar(&appid, "appid", os.Getenv("APPID"), "appid required")
-	flag.StringVar(&hostname, "hostname", os.Getenv("HOSTNAME"), "hostname required")
-	flag.StringVar(&env, "env", os.Getenv("ENV"), "env required")
-	port, _ = strconv.Atoi(os.Getenv("PORT"))
-	flag.IntVar(&port, "port", port, "port required")
-}
-
 func main() {
+	c := flag.String("c", "", "config file path")
 	flag.Parse()
-	if ip == "" || port == 0 || env == "" || appid == "" || hostname == "" {
-		panic("init ip,port,env,appid,hostname error")
+	config, err := loadConfig(*c)
+	if err != nil {
+		log.Fatal("load config fail!", err)
 	}
 
-	nodes := []string{"localhost:8881"}
-	conf := &naming.Config{Nodes: nodes, Env: env}
+	conf := &naming.Config{Nodes: config.RegistryAddrs, Env: config.Env}
 	discovery := naming.New(conf)
 
 	option := provider.Option{
-		Ip:           ip,
-		Port:         port,
-		Hostname:     hostname,
-		Env:          env,
-		AppId:        appid,
-		NetProtocol:  provider.DefaultOption.NetProtocol,
-		ReadTimeout:  provider.DefaultOption.ReadTimeout,
-		WriteTimeout: provider.DefaultOption.WriteTimeout,
+		Ip:       config.Ip,
+		Port:     config.Port,
+		Hostname: config.Hostname,
+		Env:      config.Env,
+		AppId:    config.Appid,
 	}
 
 	srv := provider.NewRPCServer(option, discovery)
@@ -79,6 +59,28 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
 	<-quit
 	srv.Shutdown()
+}
+
+type Config struct {
+	Hostname      string   `yaml:"hostname"`
+	Appid         string   `yaml:"appid"`
+	Port          int      `yaml:"port"`
+	Ip            string   `yaml:"ip"`
+	Env           string   `yaml:"env"`
+	RegistryAddrs []string `yaml:"registry_addrs"`
+}
+
+func loadConfig(path string) (*Config, error) {
+	configFile, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	config := new(Config)
+	err = yaml.Unmarshal(configFile, config)
+	if err != nil {
+		return nil, err
+	}
+	return config, nil
 }
 
 //test

@@ -2,8 +2,8 @@ package consumer
 
 import (
 	"context"
-	"errors"
-	"fmt"
+	//"errors"
+	//"fmt"
 	"github.com/skyhackvip/service_rpc/config"
 	"github.com/skyhackvip/service_rpc/global"
 	"github.com/skyhackvip/service_rpc/protocol"
@@ -17,31 +17,37 @@ type Client interface {
 	Connect(string) error
 	Invoke(context.Context, *Service, interface{}, ...interface{}) (interface{}, error)
 	Close()
+	GetAddr() string
 }
 
 type Option struct {
 	Retries           int
+	FailMode          FailMode
 	ConnectionTimeout time.Duration
 	ReadTimeout       time.Duration
 	WriteTimeout      time.Duration
 	SerializeType     protocol.SerializeType
 	CompressType      protocol.CompressType
 	NetProtocol       string
+	LoadBalanceMode   LoadBalanceMode
 }
 
 var DefaultOption = Option{
 	Retries:           3,
+	FailMode:          Failover,
 	ConnectionTimeout: 5 * time.Second,
 	ReadTimeout:       25 * time.Second,
 	WriteTimeout:      25 * time.Second,
 	SerializeType:     protocol.Gob,
 	CompressType:      protocol.None,
 	NetProtocol:       "tcp",
+	LoadBalanceMode:   RoundRobinBalance,
 }
 
 type RPCClient struct {
 	conn   net.Conn
 	option Option
+	addr   string
 }
 
 func NewClient(option Option) Client {
@@ -54,6 +60,7 @@ func (cli *RPCClient) Connect(addr string) error {
 		return err
 	}
 	cli.conn = conn
+	cli.addr = addr
 	return nil
 }
 
@@ -68,6 +75,10 @@ func (cli *RPCClient) Close() {
 	if cli.conn != nil {
 		cli.conn.Close()
 	}
+}
+
+func (cli *RPCClient) GetAddr() string {
+	return cli.addr
 }
 
 //make call func
@@ -166,7 +177,8 @@ func (cli *RPCClient) makeCall(service *Service, methodPtr interface{}) {
 func (cli *RPCClient) wrapCall(ctx context.Context, stub interface{}, params ...interface{}) (interface{}, error) {
 	f := reflect.ValueOf(stub).Elem()
 	if len(params) != f.Type().NumIn() {
-		return nil, errors.New(fmt.Sprintf("params not adapted: %d-%d", len(params), f.Type().NumIn()))
+		return nil, global.ParamErr
+		//errors.New(fmt.Sprintf("params not adapted: %d-%d", len(params), f.Type().NumIn()))
 	}
 
 	in := make([]reflect.Value, len(params))
