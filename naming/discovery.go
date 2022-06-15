@@ -166,7 +166,7 @@ func (dis *Discovery) renew(instance *Instance) error {
 	}
 	if res.Code != 200 {
 		log.Printf("uri is (%v), response code (%v)\n", uri, res.Code)
-		return err
+		return errors.New("not found")
 	}
 	return nil
 }
