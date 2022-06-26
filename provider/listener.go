@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"errors"
 	"fmt"
 	"github.com/skyhackvip/service_rpc/config"
 	"github.com/skyhackvip/service_rpc/global"
@@ -12,8 +13,10 @@ import (
 	"time"
 )
 
+var ServerClosedErr = errors.New("server closed error!")
+
 type Listener interface {
-	Run()
+	Run() error
 	SetHandler(string, Handler)
 	SetPlugins(PluginContainer)
 	Close()
@@ -29,9 +32,9 @@ type RPCListener struct {
 	Plugins     PluginContainer
 	Handlers    map[string]Handler
 	nl          net.Listener
-	doneChan    chan struct{} //控制结束
+	doneChan    chan struct{} //外层控制结束通道
 	handlingNum int32         //处理中任务数
-	shutdown    int32         //关闭处理中
+	shutdown    int32         //关闭处理中标志位
 }
 
 func NewRPCListener(option Option) *RPCListener {
@@ -56,19 +59,24 @@ func (l *RPCListener) SetHandler(name string, handler Handler) {
 }
 
 //start listening and waiting for connection
-func (l *RPCListener) Run() { //return
-	//listen on port by tcp TODO
+func (l *RPCListener) Run() error {
+	//listen on port by tcp
 	addr := fmt.Sprintf("%s:%d", l.ServiceIp, l.ServicePort)
 	log.Println(l.option.NetProtocol, addr)
 	nl, err := net.Listen(l.option.NetProtocol, addr)
 	if err != nil {
-		panic(err)
+		//panic(err)
+		return err
 	}
-	//lock ?
 	l.nl = nl
 	log.Printf("listen on %s success!", addr)
 
 	//accept conn
+	go l.acceptConn()
+	return nil
+}
+
+func (l *RPCListener) acceptConn() {
 	for {
 		conn, err := l.nl.Accept()
 		if err != nil {
@@ -79,8 +87,8 @@ func (l *RPCListener) Run() { //return
 			default:
 			}
 
-			if e, ok := err.(net.Error); ok && e.Temporary() { //网络发生临时错误
-				log.Printf("server accept error: %v", err)
+			if e, ok := err.(net.Error); ok && e.Temporary() { //网络发生临时错误,不退出重试
+				log.Printf("server accept network error: %v", err)
 				time.Sleep(5 * time.Millisecond)
 				continue
 			}
@@ -103,8 +111,8 @@ func (l *RPCListener) Run() { //return
 }
 
 //handle each connection
-//TODO:对异常 err 处理
 func (l *RPCListener) handleConn(conn net.Conn) {
+	//关闭挡板
 	if l.isShutdown() {
 		return
 	}
@@ -112,16 +120,13 @@ func (l *RPCListener) handleConn(conn net.Conn) {
 	//catch panic
 	defer func() {
 		if err := recover(); err != nil {
-
 			log.Printf("server %s catch panic err:%s\n", conn.RemoteAddr(), err)
-
-			//closeConn(conn)
 		}
-
 		l.CloseConn(conn)
 	}()
 
 	for {
+		//关闭挡板
 		if l.isShutdown() {
 			return
 		}
@@ -132,9 +137,15 @@ func (l *RPCListener) handleConn(conn net.Conn) {
 			conn.SetReadDeadline(startTime.Add(l.option.ReadTimeout))
 		}
 
+		//处理中任务数+1
+		atomic.AddInt32(&l.handlingNum, 1)
+		//任意退出都会导致处理中任务数-1
+		defer atomic.AddInt32(&l.handlingNum, -1)
+
 		//read from network
 		msg, err := l.receiveData(conn)
 		if err != nil || msg == nil {
+			log.Println("server receive error:", err) //timeout
 			return
 		}
 
@@ -146,35 +157,33 @@ func (l *RPCListener) handleConn(conn net.Conn) {
 		inArgs := make([]interface{}, 0)
 		err = coder.Decode(msg.Payload, &inArgs) //rpcdata
 		if err != nil {
-			log.Println("server decode request err:%v\n", err)
+			log.Println("server request decode err:%v\n", err)
 			return
 		}
-		log.Printf("server decode data finish:%v\n", inArgs)
-
-		//handling
-		atomic.AddInt32(&l.handlingNum, 1)
-		defer atomic.AddInt32(&l.handlingNum, -1)
+		//log.Printf("server request decode data finish:%v\n", inArgs)
 
 		//call local service
 		handler, ok := l.Handlers[msg.ServiceClass]
 		if !ok {
-			log.Println("server can not found handler")
+			log.Println("server can not found handler error:", msg.ServiceClass)
 			return
 		}
 
 		l.Plugins.BeforeCallHook(msg.ServiceClass, msg.ServiceMethod, inArgs) //ctx
+
 		result, err := handler.Handle(msg.ServiceMethod, inArgs)
+
 		l.Plugins.AfterCallHook(msg.ServiceClass, msg.ServiceMethod, inArgs, result, err)
-		log.Println("server call local service finish! result:", result)
+		//log.Println("server call local service finish! result:", result)
 
 		//encode
 		encodeRes, err := coder.Encode(result) //[]byte result + err
 		if err != nil {
-			log.Printf("server encode err:%v\n", err)
+			log.Printf("server response encode err:%v\n", err)
 			return
 		}
 
-		//send result
+		//send result timeout
 		if l.option.WriteTimeout != 0 {
 			conn.SetWriteDeadline(startTime.Add(l.option.WriteTimeout))
 		}
@@ -186,7 +195,9 @@ func (l *RPCListener) handleConn(conn net.Conn) {
 			log.Printf("server send err:%v\n", err) //timeout
 			return
 		}
+
 		log.Printf("server send result finish! total runtime: %v", time.Now().Sub(startTime).Seconds())
+		return
 	}
 }
 
@@ -205,21 +216,6 @@ func (l *RPCListener) receiveData(conn net.Conn) (*protocol.RPCMsg, error) {
 		//rate limit
 		return nil, err
 	}
-
-	//decode
-	/*coder := global.Codecs[msg.Header.SerializeType()] //get from cache
-	if coder == nil {
-		return
-	}
-	inArgs := make([]interface{}, 0)
-	err = coder.Decode(msg.Payload, &inArgs) //rpcdata
-	if err != nil {
-		log.Println("server decode request err:%v\n", err)
-		return
-	}
-	log.Printf("server decode data finish:%v\n", inArgs)
-	*/
-
 	return msg, nil
 }
 
@@ -254,7 +250,6 @@ func (l *RPCListener) closeDoneChan() {
 
 func (l *RPCListener) CloseConn(conn net.Conn) {
 	//activeconn
-
 	conn.Close()
 
 	//plugin
@@ -279,6 +274,7 @@ func (l *RPCListener) Shutdown() {
 	log.Println("server shutdown")
 }
 
+//是否处于关闭流程
 func (l *RPCListener) isShutdown() bool {
 	return atomic.LoadInt32(&l.shutdown) == 1
 }

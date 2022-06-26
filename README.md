@@ -1,13 +1,17 @@
 # RPC 框架
 
 - 服务端启动
+先保障注册中心启动
+
 ```
-PORT=8811 APPID=UserService ENV=dev go run server.go
+ cd demo/server
+ go run server.go -c config.yaml
 ```
 
 - 客户端测试
 ```
-go run client.go
+cd demo/client
+go run client_proxy.go
 ```
 
 ## 设计原理及代码解读

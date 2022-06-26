@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+var maxRegisterRetry int = 2
+
 type Server interface {
 	Register(string, interface{}) //error
 	Run()
@@ -29,8 +31,8 @@ type Option struct {
 
 var DefaultOption = Option{
 	NetProtocol:  "tcp",
-	ReadTimeout:  15 * time.Millisecond,
-	WriteTimeout: 15 * time.Millisecond,
+	ReadTimeout:  5 * time.Second,
+	WriteTimeout: 5 * time.Second,
 }
 
 type RPCServer struct {
@@ -74,31 +76,45 @@ func (svr *RPCServer) RegisterName(name string, class interface{}) {
 
 //service start
 func (svr *RPCServer) Run() {
-	//register in discovery
-	err := svr.registerToNaming()
-	if err != nil {
-		log.Fatal(err)
-	}
+	//先启动后暴露服务
 	svr.listener.SetPlugins(svr.Plugins)
-	go svr.listener.Run()
+	err := svr.listener.Run()
+	if err != nil {
+		panic(err)
+	}
+
+	//register in discovery,注册失败（重试2次）退出服务
+	err = svr.registerToNaming()
+	if err != nil {
+		svr.Close()
+		panic(err)
+	}
 }
 
 //service close
 func (svr *RPCServer) Close() {
 	log.Println("close and cancel: ", svr.option.AppId, svr.option.Hostname)
+	//从服务注册中心注销
+	if svr.cancelFunc != nil {
+		svr.cancelFunc()
+	}
+	//关闭当前服务
 	if svr.listener != nil {
 		svr.listener.Close()
 	}
-	svr.cancelFunc()
 }
 
 //service shutdown gracefully
 func (svr *RPCServer) Shutdown() {
 	log.Println("shutdown and cancel:", svr.option.AppId, svr.option.Hostname)
+	//从服务注册中心注销
+	if svr.cancelFunc != nil {
+		svr.cancelFunc()
+	}
+	//关闭当前服务
 	if svr.listener != nil {
 		svr.listener.Shutdown()
 	}
-	svr.cancelFunc()
 }
 
 func (svr *RPCServer) registerToNaming() error {
@@ -108,7 +124,7 @@ func (svr *RPCServer) registerToNaming() error {
 		Hostname: svr.option.Hostname,
 		Addrs:    svr.listener.GetAddrs(),
 	}
-	retries := 2
+	retries := maxRegisterRetry
 	for retries > 0 {
 		retries--
 		cancel, err := svr.registry.Register(context.Background(), instance)

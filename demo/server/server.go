@@ -2,18 +2,19 @@ package main
 
 import (
 	"encoding/gob"
+	"errors"
 	"flag"
-	"fmt"
 	"github.com/skyhackvip/service_rpc/naming"
 	"github.com/skyhackvip/service_rpc/provider"
-	"github.com/skyhackvip/service_rpc/provider/plugin"
+	//"github.com/skyhackvip/service_rpc/provider/plugin"
+	"context"
 	yaml "gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
-	//	"time"
+	"time"
 )
 
 func main() {
@@ -36,14 +37,15 @@ func main() {
 	}
 
 	srv := provider.NewRPCServer(option, discovery)
-	srv.Plugins.Add(plugin.RegisterPlugin{})
-	srv.Plugins.Add(plugin.ConnPlugin{})
-	srv.Plugins.Add(plugin.BeforeReadPlugin{})
-	srv.Plugins.Add(plugin.AfterReadPlugin{})
-	srv.Plugins.Add(plugin.BeforeCallPlugin{})
-	srv.Plugins.Add(plugin.MonitorPlugin{})
-	srv.Plugins.Add(plugin.BeforeWritePlugin{})
-	srv.Plugins.Add(plugin.AfterWritePlugin{})
+	/*	srv.Plugins.Add(plugin.RegisterPlugin{})
+		srv.Plugins.Add(plugin.ConnPlugin{})
+		srv.Plugins.Add(plugin.BeforeReadPlugin{})
+		srv.Plugins.Add(plugin.AfterReadPlugin{})
+		srv.Plugins.Add(plugin.BeforeCallPlugin{})
+		srv.Plugins.Add(plugin.MonitorPlugin{})
+		srv.Plugins.Add(plugin.BeforeWritePlugin{})
+		srv.Plugins.Add(plugin.AfterWritePlugin{})
+	*/
 
 	//register local service
 	srv.RegisterName("User", &UserHandler{})
@@ -58,7 +60,16 @@ func main() {
 	quit := make(chan os.Signal)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
 	<-quit
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	log.Println("start shutdown server")
 	srv.Shutdown()
+	select {
+	case <-ctx.Done():
+		log.Println("server close timeout")
+	}
+	log.Println("server exiting")
 }
 
 type Config struct {
@@ -115,10 +126,10 @@ func (u *UserHandler) Login(name, pass string) bool {
 }
 
 func (u *UserHandler) GetUserById(id int) (User, error) {
-	//time.Sleep(10 * time.Second)
 	log.Println("start to query user", id)
+	//time.Sleep(3 * time.Second)
 	if u, ok := userList[id]; ok {
 		return u, nil
 	}
-	return User{}, fmt.Errorf("id %d not found", id)
+	return User{}, errors.New("id not found error! id=" + string(id))
 }

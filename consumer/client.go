@@ -15,7 +15,10 @@ import (
 
 type Client interface {
 	Connect(string) error
+	//直接执行
 	Invoke(context.Context, *Service, interface{}, ...interface{}) (interface{}, error)
+	//构造执行方法
+	MakeFunc(*Service, interface{})
 	Close()
 	GetAddr() string
 }
@@ -36,8 +39,8 @@ var DefaultOption = Option{
 	Retries:           3,
 	FailMode:          Failover,
 	ConnectionTimeout: 5 * time.Second,
-	ReadTimeout:       25 * time.Second,
-	WriteTimeout:      25 * time.Second,
+	ReadTimeout:       1 * time.Second,
+	WriteTimeout:      1 * time.Second,
 	SerializeType:     protocol.Gob,
 	CompressType:      protocol.None,
 	NetProtocol:       "tcp",
@@ -66,7 +69,7 @@ func (cli *RPCClient) Connect(addr string) error {
 
 func (cli *RPCClient) Invoke(ctx context.Context, service *Service, stub interface{}, params ...interface{}) (interface{}, error) {
 	//make func : this step can be prepared before invoke and store into cache
-	cli.makeCall(service, stub)
+	cli.MakeFunc(service, stub)
 	//reflect call
 	return cli.wrapCall(ctx, stub, params...)
 }
@@ -78,12 +81,12 @@ func (cli *RPCClient) Close() {
 }
 
 func (cli *RPCClient) GetAddr() string {
+	//cli.conn.RemoteAddr().String()
 	return cli.addr
 }
 
 //make call func
-func (cli *RPCClient) makeCall(service *Service, methodPtr interface{}) {
-	log.Printf("----start call:%s.%s----\n", service.Class, service.Method)
+func (cli *RPCClient) MakeFunc(service *Service, methodPtr interface{}) {
 	container := reflect.ValueOf(methodPtr).Elem() //反射获取函数元素
 	coder := global.Codecs[cli.option.SerializeType]
 
@@ -178,7 +181,6 @@ func (cli *RPCClient) wrapCall(ctx context.Context, stub interface{}, params ...
 	f := reflect.ValueOf(stub).Elem()
 	if len(params) != f.Type().NumIn() {
 		return nil, global.ParamErr
-		//errors.New(fmt.Sprintf("params not adapted: %d-%d", len(params), f.Type().NumIn()))
 	}
 
 	in := make([]reflect.Value, len(params))

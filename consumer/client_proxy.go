@@ -11,7 +11,6 @@ import (
 )
 
 type ClientProxy interface {
-	//auth
 	Call(context.Context, string, interface{}, ...interface{}) (interface{}, error)
 }
 
@@ -19,6 +18,7 @@ type RPCClientProxy struct {
 	failMode FailMode
 	option   Option
 	registry naming.Registry
+	client   Client
 
 	mutex       sync.RWMutex
 	servers     []string
@@ -37,6 +37,7 @@ func NewClientProxy(appId string, option Option, registry naming.Registry) Clien
 	}
 	cp.servers = servers
 	cp.loadBalance = LoadBalanceFactory(option.LoadBalanceMode, cp.servers)
+	cp.client = NewClient(cp.option)
 	//watch server:if server addrs change, update loadBalance
 	return cp
 }
@@ -47,7 +48,7 @@ func (cp *RPCClientProxy) Call(ctx context.Context, servicePath string, stub int
 		return nil, err
 	}
 
-	client, err := cp.getClient()
+	err = cp.getConn()
 	if err != nil && cp.failMode == Failfast {
 		log.Println("failfast:", err)
 		return nil, err
@@ -59,8 +60,8 @@ func (cp *RPCClientProxy) Call(ctx context.Context, servicePath string, stub int
 		retries := cp.option.Retries
 		for retries > 0 {
 			retries--
-			if client != nil {
-				rs, err := client.Invoke(ctx, service, stub, params...)
+			if cp.client != nil {
+				rs, err := cp.client.Invoke(ctx, service, stub, params...)
 				if err == nil {
 					return rs, nil
 				}
@@ -70,19 +71,19 @@ func (cp *RPCClientProxy) Call(ctx context.Context, servicePath string, stub int
 		retries := cp.option.Retries
 		for retries > 0 {
 			retries--
-			if client != nil {
-				rs, err := client.Invoke(ctx, service, stub, params...)
+			if cp.client != nil {
+				rs, err := cp.client.Invoke(ctx, service, stub, params...)
 				//err == global.paramErr
 				if err == nil || err == global.ParamErr {
 					return rs, nil
 				}
 			}
-			client, err = cp.getClient()
-			log.Println("--failover new server--", client.GetAddr())
+			err = cp.getConn()
+			log.Println("--failover new server--", cp.client.GetAddr())
 		}
 	case Failfast:
-		if client != nil {
-			rs, err := client.Invoke(ctx, service, stub, params...)
+		if cp.client != nil {
+			rs, err := cp.client.Invoke(ctx, service, stub, params...)
 			if err == nil {
 				return rs, nil
 			}
@@ -93,16 +94,15 @@ func (cp *RPCClientProxy) Call(ctx context.Context, servicePath string, stub int
 	return nil, errors.New("call error")
 }
 
-func (cp *RPCClientProxy) getClient() (Client, error) {
-	client := NewClient(cp.option)
+func (cp *RPCClientProxy) getConn() error {
 	addr := strings.Replace(cp.loadBalance.Get(), cp.option.NetProtocol+"://", "", -1)
-	err := client.Connect(addr) //长连接管理
+	err := cp.client.Connect(addr) //长连接管理
 	if err != nil {
 		log.Println("connect server fail:", err)
-		return nil, err
+		return err
 	}
 	log.Println("connect server:" + addr)
-	return client, nil
+	return nil
 }
 
 func (cp *RPCClientProxy) discoveryService(ctx context.Context, appId string) ([]string, error) {

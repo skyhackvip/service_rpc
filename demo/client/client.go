@@ -4,41 +4,33 @@ import (
 	"context"
 	"encoding/gob"
 	"github.com/skyhackvip/service_rpc/consumer"
-	"github.com/skyhackvip/service_rpc/naming"
 	"log"
+	"reflect"
 )
 
 func main() {
-	nodes := []string{"localhost:8881"}
-	conf := &naming.Config{Nodes: nodes, Env: "dev"}
-	discovery := naming.New(conf)
-
 	gob.Register(User{})
-	cli := consumer.NewClientProxy("UserService", consumer.DefaultOption, discovery)
-
-	ctx := context.Background()
 	var GetUserById func(id int) (User, error)
-	cli.Call(ctx, "User.GetUserById", &GetUserById)
-	/*if err != nil { //connect err
-		log.Fatal(err)
-	}*/
-	u, err := GetUserById(2)
-	log.Println("result:", u, err)
+	client := consumer.NewClient(consumer.DefaultOption)
+	err := client.Connect("localhost:8898")
+	if err != nil {
+		panic(err)
+	}
 
-	var Hello func() string
-	cli.Call(ctx, "Test.Hello", &Hello)
-	r := Hello()
-	log.Println("result:", r, err)
+	service, err := consumer.NewService("User.GetUserById")
+	if err != nil {
+		panic(err)
+	}
 
-	var Add func(a, b int) int
-	cli.Call(ctx, "Test.Add", &Add)
-	w := Add(1, 2)
-	log.Println("result:", w)
-
-	var Login func(string, string) bool
-	cli.Call(ctx, "User.Login", &Login)
-	v := Login("kavin", "123456")
-	log.Println("result:", v)
+	//wrap call
+	ret, err := client.Invoke(context.Background(), service, &GetUserById, 1)
+	if err != nil {
+		log.Println("call error:", err)
+	} else {
+		val := ret.([]reflect.Value)
+		user := val[0].Interface().(User)
+		log.Println("rpc return result:", user)
+	}
 
 }
 
