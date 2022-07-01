@@ -1,7 +1,8 @@
 # RPC 框架
 
 - 服务端启动
-先保障注册中心启动
+先启动服务注册中心
+[注册中心 service_discovery](https://github.com/skyhackvip/service_discovery)
 
 ```
  cd demo/server
@@ -14,6 +15,7 @@
 ```
 cd demo/client
 go run client_proxy.go
+
 ```
 
 ## 设计原理及代码解读
